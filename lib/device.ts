@@ -1,14 +1,10 @@
-// lib/device.ts
-export function getOrCreateDeviceId() {
-  if (typeof window === "undefined") return null;
-
-  let deviceId = localStorage.getItem("attendance_device_id");
-  
-  if (!deviceId) {
-    // توليد كود عشوائي فريد (UUID)
-    deviceId = crypto.randomUUID();
-    localStorage.setItem("attendance_device_id", deviceId);
+// lib/db.ts (تحديث بسيط)
+export function getDeviceId() {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem("u_device_id");
+  if (!id) {
+    id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem("u_device_id", id);
   }
-  
-  return deviceId;
+  return id;
 }

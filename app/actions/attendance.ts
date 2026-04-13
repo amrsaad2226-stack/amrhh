@@ -3,73 +3,60 @@ import db from "@/lib/db";
 import { getDistance } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 
-export async function checkInAction(employeeCode: string, lat: number, lng: number, currentDeviceId: string) {
+export async function checkInAction(code: string, lat: number, lng: number, deviceId: string) {
   try {
-    const employee = await db.employee.findUnique({
-      where: { code: employeeCode },
-    });
+    const emp = await db.employee.findUnique({ where: { code } });
+    
+    if (!emp) return { error: "الموظف غير موجود" };
 
-    if (!employee) return { error: "كود الموظف غير صحيح" };
-
-    // --- منطق بصمة الجهاز ---
-    if (!employee.deviceId) {
-      // إذا كان الموظف لم يربط جهازاً بعد، نربط هذا الجهاز الحالي كـ "جهازه الرسمي"
-      await db.employee.update({
-        where: { id: employee.id },
-        data: { deviceId: currentDeviceId }
-      });
-    } else if (employee.deviceId !== currentDeviceId) {
-      // إذا كان الجهاز الحالي لا يطابق الجهاز المسجل
-      return { error: "عذراً، لا يمكنك التسجيل إلا من جهازك الشخصي المسجل مسبقاً" };
+    // التحقق من بصمة الجهاز
+    if (!emp.deviceId) {
+      return { error: "جهازك غير مسجل. أرسل بصمة جهازك للأدمن أولاً" };
     }
-    // -----------------------
-
-    // 1. التحقق الأمني من المسافة (مرة أخرى على السيرفر لضمان عدم التلاعب)
-    const distance = getDistance(lat, lng, employee.officeLat, employee.officeLng);
-    if (distance > employee.allowDist) {
-      return { error: "فشل التحقق: أنت خارج النطاق المسموح للمكتب" };
+    
+    if (emp.deviceId !== deviceId) {
+      return { error: "عذراً! هذا ليس الجهاز المسجل لك" };
     }
 
-    // 2. التحقق من تاريخ اليوم
+    // التحقق من المسافة (سريع جداً)
+    const dist = getDistance(lat, lng, emp.officeLat, emp.officeLng);
+    if (dist > emp.allowDist) return { error: `بعيد جداً (${Math.round(dist)} متر)` };
+
+    // --- تكملة تسجيل الحضور ---
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 3. هل الموظف سجل دخول مسبقاً اليوم؟
-    const existingAttendance = await db.attendance.findUnique({
-      where: {
-        employeeId_date: {
-          employeeId: employee.id,
-          date: today,
+    const existingAttendance = await db.attendance.findFirst({
+        where: {
+            employeeId: emp.id,
+            date: today,
         },
-      },
     });
 
-    if (existingAttendance) return { error: "لقد قمت بتسجيل الحضور بالفعل اليوم!" };
+    if (existingAttendance) {
+        return { error: "لقد قمت بتسجيل الحضور بالفعل اليوم!" };
+    }
 
-    // 4. حساب حالة التأخير (بسيط)
     const now = new Date();
     const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
-    // مقارنة وقت الحضور المخطط (مثلاً 11:00) بالوقت الحالي
-    const status = currentTimeStr > employee.timeIn ? "Late" : "Present";
+    const status = currentTimeStr > emp.timeIn ? "Late" : "Present";
 
-    // 5. تسجيل البيانات في Supabase
     await db.attendance.create({
-      data: {
-        employeeId: employee.id,
-        date: today,
-        checkIn: now,
-        latIn: lat,
-        lngIn: lng,
-        status: status,
-      },
+        data: {
+            employeeId: emp.id,
+            date: today,
+            checkIn: now,
+            latIn: lat,
+            lngIn: lng,
+            status: status,
+        },
     });
 
-    revalidatePath("/"); // تحديث الصفحة لرؤية النتائج
-    return { success: `تم تسجيل حضورك بنجاح! الحالة: ${status === "Late" ? "متأخر" : "في الموعد"}` };
-
-  } catch (error) {
-    console.error(error);
-    return { error: "حدث خطأ أثناء الاتصال بقاعدة البيانات" };
+    revalidatePath("/");
+    return { success: "تم تسجيل الحضور" };
+    
+  } catch (e) {
+    console.error(e);
+    return { error: "خطأ فني في السيرفر" };
   }
 }
