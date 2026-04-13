@@ -17,16 +17,36 @@ export default function AttendancePage() {
   const handleCheckIn = () => {
     if (!employeeCode) return alert("أدخل الكود");
     setLoading(true);
-    setStatus("جاري تحديد موقعك...");
+    setStatus("جاري البحث عن أقمار صناعية لزيادة الدقة...");
+
+    // خيارات الحصول على أعلى دقة ممكنة
+    const geoOptions = {
+      enableHighAccuracy: true, // تفعيل الـ GPS الفعلي بدلاً من الواي فاي
+      timeout: 15000,           // انتظار حتى 15 ثانية للحصول على إشارة قوية
+      maximumAge: 0             // عدم استخدام أي إحداثيات قديمة مخزنة
+    };
 
     navigator.geolocation.getCurrentPosition(async (pos) => {
-      const res = await checkInAction(employeeCode, pos.coords.latitude, pos.coords.longitude, deviceId);
+      const { latitude, longitude, accuracy } = pos.coords;
+
+      // فلتر الدقة: إذا كان الخطأ أكثر من 60 متر، نطلب منه المحاولة مرة أخرى
+      if (accuracy > 60) {
+        setStatus(`الإشارة ضعيفة (دقة ${Math.round(accuracy)}م). يرجى الوقوف في مكان مكشوف والمحاولة ثانية.`);
+        setLoading(false);
+        return;
+      }
+
+      setStatus(`تم تحديد الموقع بدقة ${Math.round(accuracy)} متر. جاري التسجيل...`);
+      
+      const res = await checkInAction(employeeCode, latitude, longitude, deviceId);
       setStatus(res.error ? `❌ ${res.error}` : `✅ ${res.success}`);
       setLoading(false);
-    }, () => {
-      setStatus("❌ افتح الـ GPS");
+    }, (err) => {
+      if (err.code === 1) setStatus("❌ يرجى السماح بالوصول للموقع (Permission Denied)");
+      else if (err.code === 3) setStatus("❌ انتهى وقت البحث. حاول مرة أخرى في مكان مفتوح");
+      else setStatus("❌ فشل تحديد الموقع بدقة");
       setLoading(false);
-    }, { timeout: 5000 });
+    }, geoOptions);
   };
 
   // وظيفة النسخ السريع والبسيط
