@@ -16,6 +16,7 @@ model Employee {
   code             String   @unique // مثل ah100
   name             String
   password         String   // لتسجيل الدخول
+  deviceId         String?  @unique // الحقل الجديد لتخزين بصمة الجهاز
   role             Role     @default(EMPLOYEE) // تمييز الإداره عن الموظف
   
   // إعدادات العمل

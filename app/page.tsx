@@ -1,21 +1,26 @@
 "use client";
 import { useState } from "react";
 import { checkInAction } from "@/app/actions/attendance";
+import { getOrCreateDeviceId } from "@/lib/device";
 
 export default function AttendancePage() {
   const [status, setStatus] = useState("اضغط لتسجيل الحضور");
   const [loading, setLoading] = useState(false);
   const [copying, setCopying] = useState(false);
-  const [employeeCode, setEmployeeCode] = useState("ah100"); 
+  const [employeeCode, setEmployeeCode] = useState("ah100");
 
-  // دالة تسجيل الحضور
   const handleCheckIn = () => {
     setLoading(true);
-    setStatus("جاري تحديد موقعك...");
+    setStatus("جاري التحقق من بصمة الجهاز والموقع...");
+
+    const deviceId = getOrCreateDeviceId(); // جلب بصمة الجهاز
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       const { latitude, longitude } = position.coords;
-      const result = await checkInAction(employeeCode, latitude, longitude);
+      
+      // إرسال الـ deviceId للـ Action
+      const result = await checkInAction(employeeCode, latitude, longitude, deviceId!);
+
       if (result.error) setStatus(`❌ ${result.error}`);
       else setStatus(`✅ ${result.success}`);
       setLoading(false);
@@ -25,20 +30,14 @@ export default function AttendancePage() {
     });
   };
 
-  // دالة نسخ الإحداثيات للمرة الأولى
   const handleCopyLocation = () => {
-    setCopying(true);
+    const deviceId = getOrCreateDeviceId();
     navigator.geolocation.getCurrentPosition((position) => {
       const { latitude, longitude } = position.coords;
-      const coords = `${latitude}, ${longitude}`;
-      
-      navigator.clipboard.writeText(coords).then(() => {
-        alert(`تم نسخ الإحداثيات: ${coords}\nأرسلها الآن للإدارة لتسجيل موقعك.`);
-        setCopying(false);
+      const info = `Coordinates: ${latitude}, ${longitude}\nDevice ID: ${deviceId}`;
+      navigator.clipboard.writeText(info).then(() => {
+        alert("تم نسخ إحداثياتك وبصمة جهازك. أرسلها للادمن.");
       });
-    }, (error) => {
-      alert("فشل الحصول على الموقع. تأكد من تفعيل الـ GPS");
-      setCopying(false);
     });
   };
 
@@ -63,7 +62,6 @@ export default function AttendancePage() {
           {status}
         </div>
 
-        {/* زر تسجيل الحضور الأساسي */}
         <button
           onClick={handleCheckIn}
           disabled={loading}
@@ -77,7 +75,6 @@ export default function AttendancePage() {
         <div className="border-t border-slate-100 pt-6 mt-2">
           <p className="text-xs text-slate-400 mb-3">خاص للموظفين الجدد:</p>
           
-          {/* زر نسخ الإحداثيات للإدارة */}
           <button
             onClick={handleCopyLocation}
             disabled={copying}
