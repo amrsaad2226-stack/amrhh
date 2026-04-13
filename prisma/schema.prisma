@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,9 +10,61 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// مثال لجدول بسيط لو حابب تجربه
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
+// 1. جدول الموظفين
+model Employee {
+  id               Int      @id @default(autoincrement())
+  code             String   @unique // مثل ah100
+  name             String
+  password         String   // لتسجيل الدخول
+  role             Role     @default(EMPLOYEE) // تمييز الإداره عن الموظف
+  
+  // إعدادات العمل
+  dailyHours       Int      @default(10)
+  dailySalary      Decimal  @db.Decimal(10, 2)
+  department       String
+  acNo             String?  // AC-No
+  
+  // إعدادات الموقع الجغرافي (تم فصل الطول والعرض لسهولة الحساب)
+  officeLat        Float    // خط العرض للمكتب
+  officeLng        Float    // خط الطول للمكتب
+  locName          String   // اسم الموقع (بلقاس، دمياط...)
+  allowDist        Int      @default(50) // المسافة المسموحة بالمتر
+  
+  // المواعيد والإجازات
+  timeIn           String   // وقت الحضور المخطط "11:00"
+  timeOut          String   // وقت الانصراف المخطط "23:00"
+  isOvertimeEnabled Boolean @default(true) // edafy
+  weeklyOffDay     String   @default("Friday") // agaza
+  
+  image            String?  // رابط الصورة
+  createdAt        DateTime @default(now())
+  
+  // علاقة مع جدول الحضور
+  attendances      Attendance[]
+}
+
+// 2. جدول سجلات الحضور والانصراف اليومية
+model Attendance {
+  id          Int      @id @default(autoincrement())
+  date        DateTime @default(now()) @db.Date // تاريخ اليوم فقط
+  
+  checkIn     DateTime? // وقت الدخول الفعلي
+  checkOut    DateTime? // وقت الخروج الفعلي
+  
+  // تخزين الموقع الذي تم منه البصمة فعلياً للتأكد
+  latIn       Float?
+  lngIn       Float?
+  
+  status      String?   // (Present, Late, Absent)
+  overtime    Int       @default(0) // عدد الدقائق الإضافية
+  
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date]) // منع تسجيل دخول مرتين لنفس الموظف في نفس اليوم
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
 }
