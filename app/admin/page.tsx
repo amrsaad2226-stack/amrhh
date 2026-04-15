@@ -6,6 +6,9 @@ export default async function AdminDashboard() {
   // جلب تاريخ اليوم
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  
+  // جلب الفروع من قاعدة البيانات
+  const branches = await db.branch.findMany({ select: { id: true, name: true } });
 
   // جلب كل الموظفين مع سجلات حضورهم لليوم فقط
   const employees = await db.employee.findMany({
@@ -22,7 +25,7 @@ export default async function AdminDashboard() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-black text-gray-800 border-r-4 border-blue-600 pr-4">لوحة تحكم المدير 🖥️</h1>
-          <AddEmployeeForm />
+          <AddEmployeeForm branches={branches} />
         </div>
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
