@@ -1,5 +1,6 @@
 // app/admin/page.tsx
 import db from "@/lib/db";
+import AddEmployeeForm from "./AddEmployeeForm";
 
 export default async function AdminDashboard() {
   // جلب تاريخ اليوم
@@ -19,7 +20,10 @@ export default async function AdminDashboard() {
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen font-sans" dir="rtl">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-black text-gray-800 mb-8 border-r-4 border-blue-600 pr-4">لوحة تحكم المدير 🖥️</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-black text-gray-800 border-r-4 border-blue-600 pr-4">لوحة تحكم المدير 🖥️</h1>
+          <AddEmployeeForm />
+        </div>
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {employees.map((emp) => {
