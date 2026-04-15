@@ -12,7 +12,6 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     
     if (!employee) return { error: "الموظف غير موجود" };
 
-    // التحقق من بصمة الجهاز
     if (!employee.deviceId) {
       return { error: "جهازك غير مسجل. أرسل بصمة جهازك للأدمن أولاً" };
     }
@@ -56,10 +55,8 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     const now = new Date();
     const dayOfWeek = now.toLocaleString('en-US', { weekday: 'long' });
 
-    let requiredHours = (new Date(`1970-01-01T${employee.timeOut}Z`).getTime() - new Date(`1970-01-01T${employee.timeIn}Z`).getTime()) / (1000 * 60 * 60);
-    if (dayOfWeek === employee.offDay) {
-        requiredHours = employee.offDayHours;
-    }
+    const isOffDay = employee.offDay === dayOfWeek;
+    const hoursNeeded = isOffDay ? employee.offDayHours : employee.dailyHours;
 
     const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const status = currentTimeStr > employee.timeIn ? "Late" : "Present";
@@ -72,7 +69,7 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
             latIn: lat,
             lngIn: lng,
             status: status,
-            requiredHours: requiredHours,
+            requiredHours: hoursNeeded,
         },
     });
 
