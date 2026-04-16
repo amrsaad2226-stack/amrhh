@@ -7,94 +7,90 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
   try {
     const employee = await db.employee.findUnique({
       where: { code },
-      include: { branch: true } // مهم جداً لجلب إحداثيات الفرع المحدد
+      include: { branch: true } // جلب بيانات الفرع المربوط به
     });
-    
-    if (!employee) {
-      return { error: "الموظف غير موجود" };
-    }
 
+    if (!employee) return { error: "كود الموظف غير صحيح" };
+
+    // 1. التحقق من بصمة الجهاز
     if (!employee.deviceId) {
-      // The user has not registered a device yet.
-      // Let's assign this device to them.
-      await db.employee.update({
-        where: { id: employee.id },
-        data: { deviceId },
-      });
-    } else if (employee.deviceId !== deviceId) {
-      return { error: "عذراً! هذا ليس الجهاز المسجل لك" };
+      return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
+    }
+    if (employee.deviceId !== deviceId) {
+      return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
     }
 
-    // Re-fetch employee data after potential deviceId update
-    const currentEmployee = await db.employee.findUnique({
-      where: { code },
-      include: { branch: true }
-    });
-
-    if (!currentEmployee) {
-        return { error: "خطأ في تحديث بيانات الموظف." };
-    }
-
+    // 2. التحقق من الموقع والفرع
     let isNearAnyAllowedBranch = false;
+    let distanceMsg = "";
 
-    if (currentEmployee.isAnyBranch) {
-      // الموظف "مفتوح" - نتحقق من قربه من أي فرع في الشركة
+    if (employee.isAnyBranch) {
       const allBranches = await db.branch.findMany();
+      if (allBranches.length === 0) return { error: "لا يوجد فروع مسجلة في النظام" };
+      
       for (const b of allBranches) {
         const dist = getDistance(lat, lng, b.latitude, b.longitude);
-        if (dist <= 50) { // مسافة 50 متر
+        if (dist <= (employee.allowDist || 50)) {
           isNearAnyAllowedBranch = true;
           break;
         }
       }
-    } else if (currentEmployee.branch) {
-      // الموظف له فرع محدد
-      const dist = getDistance(lat, lng, currentEmployee.branch.latitude, currentEmployee.branch.longitude);
-      if (dist <= 50) isNearAnyAllowedBranch = true;
+    } else if (employee.branch) {
+      const dist = getDistance(lat, lng, employee.branch.latitude, employee.branch.longitude);
+      distanceMsg = `(المسافة: ${Math.round(dist)} متر)`;
+      if (dist <= (employee.allowDist || 50)) {
+        isNearAnyAllowedBranch = true;
+      }
     } else {
-        // Employee is not "any branch" and has no specific branch assigned.
-        return { error: "لم يتم تحديد فرع لك، ولا تملك صلاحية البصمة في أي فرع." };
+      return { error: "لم يتم ربط هذا الموظف بأي فرع في الإعدادات" };
     }
 
     if (!isNearAnyAllowedBranch) {
-      return { error: "عذراً، أنت لست في النطاق الجغرافي لأي فرع مصرح لك بالبصمة فيه" };
+      return { error: `أنت خارج النطاق الجغرافي للعمل ${distanceMsg}` };
     }
 
+    // 3. التحقق من عدم تسجيل الحضور مسبقاً اليوم
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const existingAttendance = await db.attendance.findFirst({
-        where: {
-            employeeId: currentEmployee.id,
-            date: today,
-        }
+      where: { employeeId: employee.id, date: today },
     });
 
-    if (existingAttendance?.checkIn) {
-        return { error: "لقد قمت بتسجيل الحضور بالفعل اليوم!" };
+    if (existingAttendance) {
+      return { error: "لقد قمت بتسجيل الحضور بالفعل اليوم!" };
     }
 
+    // 4. حساب وقت الدخول الفعلي وتحديد حالة التأخير
     const now = new Date();
     const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const status = currentTimeStr > currentEmployee.timeIn ? "Late" : "Present";
+    const status = currentTimeStr > employee.timeIn ? "Late" : "Present";
 
+    // 5. تحديد الساعات المطلوبة (عادي أم يوم إجازة)
+    const todayName = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now);
+    const isOffDay = employee.offDay === todayName;
+    const hoursNeeded = isOffDay ? (employee.offDayHours || 0) : (employee.dailyHours || 10);
+
+    // 6. تسجيل البيانات
     await db.attendance.create({
-        data: {
-            employeeId: currentEmployee.id,
-            date: today,
-            checkIn: now,
-            latIn: lat,
-            lngIn: lng,
-            status: status,
-        },
+      data: {
+        employeeId: employee.id,
+        date: today,
+        checkIn: now,
+        latIn: lat,
+        lngIn: lng,
+        status: status,
+        requiredHours: hoursNeeded,
+        overtime: 0
+      },
     });
 
-    revalidatePath("/");
     revalidatePath("/admin");
-    return { success: "تم تسجيل الحضور بنجاح" };
-    
-  } catch (e: any) {
-    console.error(e);
-    return { error: "خطأ فني في السيرفر" };
+    return { success: `تم تسجيل حضورك بنجاح! (${status === "Late" ? "متأخر ⚠️" : "في الموعد ✅"})` };
+
+  } catch (error: any) {
+    console.error("Check-in Error:", error);
+    // إرجاع رسالة الخطأ بدلاً من إيقاف السيرفر
+    return { error: `خطأ تقني: ${error.message || "حدث خطأ في قاعدة البيانات"}` };
   }
 }
