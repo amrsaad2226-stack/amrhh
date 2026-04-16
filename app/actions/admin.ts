@@ -38,6 +38,10 @@ export async function addEmployee(data: any) {
     revalidatePath("/admin");
     return { success: true };
   } catch (e: any) {
-    return { error: "خطأ في البيانات" };
+    console.error(e);
+    if (e.code === 'P2002' && e.meta?.target?.includes('code')) {
+      return { error: "هذا الكود مستخدم بالفعل لموظف آخر." };
+    }
+    return { error: "خطأ في البيانات المدخلة أو الكود مكرر" };
   }
 }

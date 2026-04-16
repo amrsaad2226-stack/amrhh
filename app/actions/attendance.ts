@@ -7,76 +7,95 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
   try {
     const employee = await db.employee.findUnique({
       where: { code },
-      include: { branch: true },
+      include: { branch: true } // مهم جداً لجلب إحداثيات الفرع المحدد
     });
     
-    if (!employee) return { error: "الموظف غير موجود" };
+    if (!employee) {
+      return { error: "الموظف غير موجود" };
+    }
 
     if (!employee.deviceId) {
-      return { error: "جهازك غير مسجل. أرسل بصمة جهازك للأدمن أولاً" };
-    }
-    
-    if (employee.deviceId !== deviceId) {
+      // The user has not registered a device yet.
+      // Let's assign this device to them.
+      await db.employee.update({
+        where: { id: employee.id },
+        data: { deviceId },
+      });
+    } else if (employee.deviceId !== deviceId) {
       return { error: "عذراً! هذا ليس الجهاز المسجل لك" };
     }
 
-    let isNearBranch = false;
+    // Re-fetch employee data after potential deviceId update
+    const currentEmployee = await db.employee.findUnique({
+      where: { code },
+      include: { branch: true }
+    });
 
-    if (employee.isAnyBranch) {
-      const branches = await db.branch.findMany();
-      for (const branch of branches) {
-        const dist = getDistance(lat, lng, branch.latitude, branch.longitude);
-        if (dist <= 50) {
-          isNearBranch = true;
+    if (!currentEmployee) {
+        return { error: "خطأ في تحديث بيانات الموظف." };
+    }
+
+    let isNearAnyAllowedBranch = false;
+
+    if (currentEmployee.isAnyBranch) {
+      // الموظف "مفتوح" - نتحقق من قربه من أي فرع في الشركة
+      const allBranches = await db.branch.findMany();
+      for (const b of allBranches) {
+        const dist = getDistance(lat, lng, b.latitude, b.longitude);
+        if (dist <= 50) { // مسافة 50 متر
+          isNearAnyAllowedBranch = true;
           break;
         }
       }
-    } else if (employee.branch) {
-      const dist = getDistance(lat, lng, employee.branch.latitude, employee.branch.longitude);
-      if (dist <= 50) isNearBranch = true;
+    } else if (currentEmployee.branch) {
+      // الموظف له فرع محدد
+      const dist = getDistance(lat, lng, currentEmployee.branch.latitude, currentEmployee.branch.longitude);
+      if (dist <= 50) isNearAnyAllowedBranch = true;
+    } else {
+        // Employee is not "any branch" and has no specific branch assigned.
+        return { error: "لم يتم تحديد فرع لك، ولا تملك صلاحية البصمة في أي فرع." };
     }
 
-    if (!isNearBranch) return { error: "أنت لست في أي فرع معتمد" };
+    if (!isNearAnyAllowedBranch) {
+      return { error: "عذراً، أنت لست في النطاق الجغرافي لأي فرع مصرح لك بالبصمة فيه" };
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const existingAttendance = await db.attendance.findFirst({
+    const existingAttendance = await db.attendance.findUnique({
         where: {
-            employeeId: employee.id,
-            date: today,
+            employeeId_date: {
+                employeeId: currentEmployee.id,
+                date: today,
+            }
         },
     });
 
-    if (existingAttendance) {
+    if (existingAttendance?.checkIn) {
         return { error: "لقد قمت بتسجيل الحضور بالفعل اليوم!" };
     }
 
     const now = new Date();
-    const dayOfWeek = now.toLocaleString('en-US', { weekday: 'long' });
-
-    const isOffDay = employee.offDay === dayOfWeek;
-    const hoursNeeded = isOffDay ? employee.offDayHours : employee.dailyHours;
-
     const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const status = currentTimeStr > employee.timeIn ? "Late" : "Present";
+    const status = currentTimeStr > currentEmployee.timeIn ? "Late" : "Present";
 
     await db.attendance.create({
         data: {
-            employeeId: employee.id,
+            employeeId: currentEmployee.id,
             date: today,
             checkIn: now,
             latIn: lat,
             lngIn: lng,
             status: status,
-            requiredHours: hoursNeeded,
         },
     });
 
     revalidatePath("/");
-    return { success: "تم تسجيل الحضور" };
+    revalidatePath("/admin");
+    return { success: "تم تسجيل الحضور بنجاح" };
     
-  } catch (e) {
+  } catch (e: any) {
     console.error(e);
     return { error: "خطأ فني في السيرفر" };
   }

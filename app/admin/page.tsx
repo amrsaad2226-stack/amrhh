@@ -7,8 +7,10 @@ export default async function AdminDashboard() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // جلب الفروع من قاعدة البيانات
-  const branches = await db.branch.findMany({ select: { id: true, name: true } });
+  // جلب الفروع الحقيقية من الداتا بيز
+  const branches = await db.branch.findMany({
+    select: { id: true, name: true }
+  });
 
   // جلب كل الموظفين مع سجلات حضورهم لليوم فقط
   const employees = await db.employee.findMany({
