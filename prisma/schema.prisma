@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // 1. جدول الفروع
@@ -65,8 +66,6 @@ model Attendance {
 
   employeeId    Int
   employee      Employee @relation(fields: [employeeId], references: [id])
-
-  @@unique([employeeId, date])
 }
 
 enum Role {
