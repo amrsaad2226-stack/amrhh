@@ -63,13 +63,11 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const existingAttendance = await db.attendance.findUnique({
+    const existingAttendance = await db.attendance.findFirst({
         where: {
-            employeeId_date: {
-                employeeId: currentEmployee.id,
-                date: today,
-            }
-        },
+            employeeId: currentEmployee.id,
+            date: today,
+        }
     });
 
     if (existingAttendance?.checkIn) {
