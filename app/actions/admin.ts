@@ -2,7 +2,7 @@
 import db from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
-export async function addEmployeeAction(data: any) {
+export async function addEmployee(data: any) {
   const { name, code, password, department, dailySalary, offDay } = data;
 
   try {
