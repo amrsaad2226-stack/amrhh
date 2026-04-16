@@ -37,6 +37,7 @@ model Employee {
   dailySalary      Float
   overtimeRate     Float    @default(1.0)  // معامل حساب الإضافي (الافتراضي 1)
   department       String
+  allowDist        Int      @default(50)
 
   // نظام الإجازات والمواعيد
   offDay           String   @default("NONE") // السبت، الأحد... أو NONE
@@ -58,6 +59,8 @@ model Attendance {
   
   latIn         Float?
   lngIn         Float?
+  latOut        Float?
+  lngOut        Float?
   
   status        String?   
   

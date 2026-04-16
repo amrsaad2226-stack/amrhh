@@ -94,3 +94,92 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     return { error: `خطأ تقني: ${error.message || "حدث خطأ في قاعدة البيانات"}` };
   }
 }
+
+export async function checkOutAction(code: string, lat: number, lng: number, deviceId: string) {
+  try {
+    // 1. Find employee and validate device
+    const employee = await db.employee.findUnique({
+      where: { code },
+      include: { branch: true },
+    });
+
+    if (!employee) return { error: "كود الموظف غير صحيح" };
+    if (!employee.deviceId) return { error: "حسابك غير مفعل بعد." };
+    if (employee.deviceId !== deviceId) return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
+
+    // 2. Validate location
+    let isNearAnyAllowedBranch = false;
+    let distanceMsg = "";
+
+    if (employee.isAnyBranch) {
+      const allBranches = await db.branch.findMany();
+      if (allBranches.length === 0) return { error: "لا يوجد فروع مسجلة في النظام" };
+      for (const b of allBranches) {
+        if (getDistance(lat, lng, b.latitude, b.longitude) <= (employee.allowDist || 50)) {
+          isNearAnyAllowedBranch = true;
+          break;
+        }
+      }
+    } else if (employee.branch) {
+      const dist = getDistance(lat, lng, employee.branch.latitude, employee.branch.longitude);
+      distanceMsg = `(المسافة: ${Math.round(dist)} متر)`;
+      if (dist <= (employee.allowDist || 50)) {
+        isNearAnyAllowedBranch = true;
+      }
+    } else {
+      return { error: "لم يتم ربط هذا الموظف بأي فرع في الإعدادات" };
+    }
+
+    if (!isNearAnyAllowedBranch) {
+      return { error: `أنت خارج النطاق الجغرافي للعمل ${distanceMsg}` };
+    }
+
+    // 3. Find today's attendance record
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const attendance = await db.attendance.findFirst({
+      where: { employeeId: employee.id, date: today },
+    });
+
+    if (!attendance) {
+      return { error: "لم تقم بتسجيل الحضور اليوم، لا يمكنك تسجيل الانصراف" };
+    }
+    if (attendance.checkOut) {
+      return { error: "لقد قمت بتسجيل الانصراف بالفعل اليوم!" };
+    }
+     if (!attendance.checkIn) {
+      return { error: "خطأ: مسجل في الحضور ولكن لا يوجد وقت دخول!" };
+    }
+
+
+    // 4. Calculate work duration and overtime
+    const now = new Date();
+    const checkInTime = new Date(attendance.checkIn);
+    // diff in milliseconds
+    const workDurationMs = now.getTime() - checkInTime.getTime();
+    // diff in hours (float)
+    const workDurationHours = workDurationMs / (1000 * 60 * 60);
+
+    const overtime = Math.max(0, workDurationHours - (attendance.requiredHours || 10));
+
+    // 5. Update attendance record
+    await db.attendance.update({
+      where: { id: attendance.id },
+      data: {
+        checkOut: now,
+        latOut: lat,
+        lngOut: lng,
+        duration: workDurationHours,
+        overtime: overtime,
+      },
+    });
+    
+    revalidatePath("/admin");
+    return { success: `تم تسجيل انصرافك بنجاح!` };
+
+  } catch (error: any) {
+    console.error("Check-out Error:", error);
+    return { error: `خطأ تقني: ${error.message || "حدث خطأ في قاعدة البيانات"}` };
+  }
+}

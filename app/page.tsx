@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { getDeviceId } from "@/lib/device";
 import { checkInAction } from "@/app/actions/attendance";
 
@@ -88,14 +89,18 @@ export default function AttendancePage() {
         <button
           onClick={handleCheckIn}
           disabled={loading}
-          className={`w-full py-5 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all mb-8 ${
+          className={`w-full py-5 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all mb-4 ${
             loading ? "bg-slate-300" : "bg-gradient-to-r from-green-500 to-emerald-600"
           }`}
         >
           {loading ? "إنتظر..." : "تسجيل بصمة الآن"}
         </button>
 
-        <div className="pt-6 border-t border-slate-100">
+        <Link href="/checkout" className="block text-center w-full py-3 bg-white border-2 border-red-100 text-red-600 rounded-xl font-bold text-sm hover:bg-red-50 active:bg-red-100 transition-colors">
+          تسجيل الانصراف
+        </Link>
+
+        <div className="pt-6 mt-6 border-t border-slate-100">
           <p className="text-[11px] text-slate-400 mb-3 text-center italic">للموظفين الجدد (تفعيل الحساب):</p>
           <button
             onClick={handleCopyFullInfo}
