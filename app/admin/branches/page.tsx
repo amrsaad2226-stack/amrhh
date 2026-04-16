@@ -27,7 +27,12 @@ export default async function ManageBranches() {
           <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-slate-700">
             <Plus className="text-blue-600" size={20} /> إضافة فرع جديد
           </h2>
-          <form action={addBranch} className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          <form 
+            action={async (formData) => {
+              await addBranch(formData);
+            }} 
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end"
+          >
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-2">اسم الفرع</label>
               <input name="name" required className="w-full p-4 bg-slate-50 border rounded-2xl outline-none focus:border-blue-500 font-bold" placeholder="مثلاً: فرع دمياط" />
