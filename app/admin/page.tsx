@@ -1,6 +1,8 @@
 // app/admin/page.tsx
 import db from "@/lib/db";
 import AddEmployeeForm from "./AddEmployeeForm";
+import Link from "next/link";
+import { Building2 } from "lucide-react";
 
 export default async function AdminDashboard() {
   // جلب تاريخ اليوم
@@ -27,7 +29,13 @@ export default async function AdminDashboard() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-black text-gray-800 border-r-4 border-blue-600 pr-4">لوحة تحكم المدير 🖥️</h1>
-          <AddEmployeeForm branches={branches} />
+          <div className="flex items-center gap-4">
+            <Link href="/admin/branches" className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-6 py-3 rounded-2xl font-bold hover:bg-slate-50 transition-all shadow-sm">
+              <Building2 size={20} />
+              إدارة الفروع
+            </Link>
+            <AddEmployeeForm branches={branches} />
+          </div>
         </div>
         
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
