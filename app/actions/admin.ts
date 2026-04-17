@@ -73,3 +73,17 @@ export async function addBranch(formData: FormData) {
     return { error: `خطأ تقني: ${error.message || "فشل الاتصال بقاعدة البيانات"}` };
   }
 }
+
+// أضف هذه الدالة في نهاية ملف app/actions/admin.ts
+export async function activateEmployeeDevice(employeeId: number, deviceId: string) {
+  try {
+    await db.employee.update({
+      where: { id: employeeId },
+      data: { deviceId }
+    });
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return { error: "فشل تفعيل الجهاز" };
+  }
+}

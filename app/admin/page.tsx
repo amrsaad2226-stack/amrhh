@@ -2,7 +2,8 @@
 import db from "@/lib/db";
 import AddEmployeeForm from "./AddEmployeeForm";
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { Building2, MapPin } from "lucide-react";
+import ActivateDeviceBtn from "./ActivateDeviceBtn";
 
 export default async function AdminDashboard() {
   // جلب تاريخ اليوم
@@ -38,48 +39,51 @@ export default async function AdminDashboard() {
           </div>
         </div>
         
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {employees.map((emp) => {
-            const attendance = emp.attendances[0]; // سجل حضور اليوم إن وجد
-            
-            return (
-              <div key={emp.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-800">{emp.name}</h2>
-                    <p className="text-gray-400 text-xs">كود: {emp.code} | {emp.department}</p>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    attendance ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                  }`}>
-                    {attendance ? "حضر" : "غائب"}
-                  </span>
-                </div>
-
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex justify-between">
-                    <span>وقت الحضور الفعلي:</span>
-                    <span className="font-mono font-bold text-blue-600">
+        <div className="overflow-x-auto bg-white rounded-2xl shadow-sm border border-gray-100">
+          <table className="min-w-full text-sm text-right text-gray-500">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+              <tr>
+                <th scope="col" className="p-5">الموظف</th>
+                <th scope="col" className="p-5">حالة اليوم</th>
+                <th scope="col" className="p-5">وقت الحضور</th>
+                <th scope="col" className="p-5">بصمة الجهاز</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((emp) => {
+                const attendance = emp.attendances[0];
+                return (
+                  <tr key={emp.id} className="bg-white border-b hover:bg-gray-50">
+                    <td className="p-5 font-bold text-gray-900 whitespace-nowrap">
+                      {emp.name}
+                      <p className="font-normal text-gray-400 text-xs">{emp.code} | {emp.department}</p>
+                    </td>
+                    <td className="p-5">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        attendance ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      }`}>
+                        {attendance ? "حضر" : "غائب"}
+                      </span>
+                    </td>
+                    <td className="p-5 font-mono font-bold text-blue-600">
                       {attendance?.checkIn ? new Date(attendance.checkIn).toLocaleTimeString('ar-EG', {hour: '2-digit', minute:'2-digit'}) : "--:--"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>الحالة:</span>
-                    <span className={`font-bold ${attendance?.status === "Late" ? "text-orange-500" : "text-green-600"}`}>
-                      {attendance?.status === "Late" ? "متأخر ⚠️" : attendance?.status === "Present" ? "في الموعد ✅" : "لم يحضر"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-gray-50 flex gap-2">
-                   {/* زرار لتصفير بصمة الجهاز (سنقوم ببرمجته لاحقاً) */}
-                   <button className="text-[10px] bg-gray-100 text-gray-500 px-3 py-1 rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">
-                     إعادة تعيين الجهاز 📱
-                   </button>
-                </div>
-              </div>
-            );
-          })}
+                    </td>
+                    {/* استبدل الجزء الخاص بعرض البصمة بهذا الكود 👇 */}
+                    <td className="p-5">
+                      {emp.deviceId ? (
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500 bg-slate-100 p-2 rounded-lg max-w-[150px] truncate border border-slate-200">
+                          <MapPin size={12} className="text-green-500" /> {emp.deviceId}
+                        </div>
+                      ) : (
+                        // هنا نضع زر التفعيل إذا كان الموظف ليس لديه بصمة مسجلة
+                        <ActivateDeviceBtn employeeId={emp.id} />
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
