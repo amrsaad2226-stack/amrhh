@@ -20,12 +20,12 @@ export async function addEmployee(data: any) {
         department: data.department,
         dailySalary: parseFloat(data.dailySalary) || 0,
         overtimeRate: parseFloat(data.overtimeRate || "1"),
-        
-        // 👈 هذا هو الجزء الذي تم إصلاحه وتأمينه
         isAnyBranch: data.branchType === "OPEN",
-        branchId: safeBranchId, 
+        branchId: safeBranchId,
         
-        // المواعيد والإجازات
+        // 👈 تأكد من وجود هذا السطر ليتم حفظ الساعات الإلزامية المحسوبة
+        dailyHours: parseInt(data.dailyHours || "10"), 
+        
         offDay: data.offDay,
         offDayHours: parseInt(data.offDayHours || "0"),
         timeIn: data.timeIn,
