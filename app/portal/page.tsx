@@ -1,3 +1,4 @@
+
 // app/portal/page.tsx
 import db from "@/lib/db";
 import { cookies } from "next/headers";
@@ -5,7 +6,7 @@ import { redirect } from "next/navigation";
 import { logoutEmployee } from "@/app/actions/auth";
 import { LogOut, Smartphone, CheckCircle2 } from "lucide-react";
 import PunchButtons from "./PunchButtons";
-import CopyIdSection from "./CopyIdSection"; // 1. تأكد من وجود هذا الملف في نفس المجلد
+import CopyIdSection from "./CopyIdSection";
 
 export default async function EmployeePortal() {
   const cookieStore = await cookies();
@@ -60,7 +61,6 @@ export default async function EmployeePortal() {
           <div className="animate-in slide-in-from-bottom duration-700">
              <div className="bg-white p-6 rounded-[2rem] border-2 border-green-50 mb-6 flex items-center gap-3">
                 <div className="bg-green-100 text-green-600 p-2 rounded-full"><CheckCircle2 size={16}/></div>
-                {/* 2. تم إضافة علامة ? هنا لحل خطأ الـ null 👇 */}
                 <p className="text-green-700 text-[10px] font-bold font-sans">الجهاز مسجل: {employee.deviceId?.substring(0, 10)}...</p>
              </div>
 
@@ -77,8 +77,8 @@ export default async function EmployeePortal() {
                    <div key={att.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
                      <span className="text-slate-500 font-bold text-xs">{att.date.toLocaleDateString('ar-EG')}</span>
                      <div className="flex gap-2">
-                        {att.checkIn && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-1 rounded-lg">حضور {att.checkIn.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</span>}
-                        {att.checkOut && <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-lg">انصراف {att.checkOut.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</span>}
+                        {att.checkIn && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-1 rounded-lg">حضور {att.checkIn.toLocaleTimeString('ar-EG', {timeZone: 'Africa/Cairo', hour:'2-digit', minute:'2-digit'})}</span>}
+                        {att.checkOut && <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-lg">انصراف {att.checkOut.toLocaleTimeString('ar-EG', {timeZone: 'Africa/Cairo', hour:'2-digit', minute:'2-digit'})}</span>}
                      </div>
                    </div>
                  ))}

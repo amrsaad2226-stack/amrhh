@@ -7,12 +7,11 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
   try {
     const employee = await db.employee.findUnique({
       where: { code },
-      include: { branch: true } // جلب بيانات الفرع المربوط به
+      include: { branch: true }
     });
 
     if (!employee) return { error: "كود الموظف غير صحيح" };
 
-    // 1. التحقق من بصمة الجهاز
     if (!employee.deviceId) {
       return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
     }
@@ -20,7 +19,6 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
     }
 
-    // 2. التحقق من الموقع والفرع
     let isNearAnyAllowedBranch = false;
     let distanceMsg = "";
 
@@ -49,8 +47,8 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       return { error: `أنت خارج النطاق الجغرافي للعمل ${distanceMsg}` };
     }
 
-    // 3. التحقق من عدم تسجيل الحضور مسبقاً اليوم
-    const today = new Date();
+    // -- TIMEZONE FIX: Use Cairo time to define "today" --
+    const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
     today.setHours(0, 0, 0, 0);
 
     const existingAttendance = await db.attendance.findFirst({
@@ -61,22 +59,27 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       return { error: "لقد قمت بتسجيل الحضور بالفعل اليوم!" };
     }
 
-    // 4. حساب وقت الدخول الفعلي وتحديد حالة التأخير
     const now = new Date();
-    const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const status = currentTimeStr > employee.timeIn ? "Late" : "Present";
 
-    // 5. تحديد الساعات المطلوبة (عادي أم يوم إجازة)
-    const todayName = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now);
+    // -- TIMEZONE FIX: Calculate status based on Cairo time --
+    const cairoTimeStr = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Cairo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(now);
+    const status = cairoTimeStr > employee.timeIn ? "Late" : "Present";
+    
+    // -- TIMEZONE FIX: Use Cairo time to determine off-days --
+    const todayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'Africa/Cairo' }).format(now);
     const isOffDay = employee.offDay === todayName;
     const hoursNeeded = isOffDay ? (employee.offDayHours || 0) : (employee.dailyHours || 10);
 
-    // 6. تسجيل البيانات
     await db.attendance.create({
       data: {
         employeeId: employee.id,
         date: today,
-        checkIn: now,
+        checkIn: now, // Store original UTC timestamp
         latIn: lat,
         lngIn: lng,
         status: status,
@@ -86,16 +89,15 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     });
 
     revalidatePath("/admin");
+    revalidatePath("/portal");
     return { success: `تم تسجيل حضورك بنجاح! (${status === "Late" ? "متأخر ⚠️" : "في الموعد ✅"})` };
 
   } catch (error: any) {
     console.error("Check-in Error:", error);
-    // إرجاع رسالة الخطأ بدلاً من إيقاف السيرفر
     return { error: `خطأ تقني: ${error.message || "حدث خطأ في قاعدة البيانات"}` };
   }
 }
 
-// أضف هذه الدالة في نهاية ملف app/actions/attendance.ts
 
 export async function checkOutAction(code: string, lat: number, lng: number, deviceId: string) {
   try {
@@ -107,7 +109,6 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
     if (!employee) return { error: "كود الموظف غير صحيح" };
     if (employee.deviceId !== deviceId) return { error: "عذراً، هذا ليس جهازك المسجل!" };
 
-    // 1. التحقق من الموقع (نفس منطق الحضور لضمان عدم الانصراف من المنزل)
     let isNearAnyAllowedBranch = false;
     if (employee.isAnyBranch) {
       const allBranches = await db.branch.findMany();
@@ -124,8 +125,8 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
 
     if (!isNearAnyAllowedBranch) return { error: "أنت خارج نطاق الفرع! لا يمكنك تسجيل الانصراف من هنا." };
 
-    // 2. البحث عن سجل حضور اليوم
-    const today = new Date();
+    // -- TIMEZONE FIX: Use Cairo time to find today's attendance record --
+    const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
     today.setHours(0, 0, 0, 0);
 
     const attendance = await db.attendance.findFirst({
@@ -136,28 +137,24 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
     if (attendance.checkOut) return { error: "لقد قمت بتسجيل الانصراف مسبقاً اليوم!" };
     if (!attendance.checkIn) return { error: "يوجد خطأ في سجل حضورك." };
 
-    // 3. الحسابات المالية الدقيقة (مدة العمل والإضافي)
     const now = new Date();
     const checkInTime = new Date(attendance.checkIn);
     
-    // حساب الفرق بالمللي ثانية ثم تحويله لساعات (أرقام عشرية مثل 8.5 ساعات)
     const diffInMs = now.getTime() - checkInTime.getTime();
     const durationHours = diffInMs / (1000 * 60 * 60);
 
-    // حساب الإضافي (لو اشتغل أكتر من المطلوب منه)
     let overtime = 0;
     if (durationHours > attendance.requiredHours) {
       overtime = durationHours - attendance.requiredHours;
     }
 
-    // 4. تحديث سجل قاعدة البيانات
     await db.attendance.update({
       where: { id: attendance.id },
       data: {
-        checkOut: now,
+        checkOut: now, // Store original UTC timestamp
         latOut: lat,
         lngOut: lng,
-        duration: parseFloat(durationHours.toFixed(2)), // تقريب لرقمين عشريين
+        duration: parseFloat(durationHours.toFixed(2)),
         overtime: parseFloat(overtime.toFixed(2)),
       }
     });
