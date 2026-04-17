@@ -4,7 +4,7 @@ import db from "@/lib/db";
 import { Users, MapPin, Clock, CheckCircle, CalendarDays } from "lucide-react";
 import AddEmployeeForm from "./AddEmployeeForm";
 import ActivateDeviceBtn from "./ActivateDeviceBtn";
-import LeaveRequestCard from "./LeaveRequestCard"; // 👈 استيراد المكون الجديد
+import LeaveActionButtons from "./LeaveActionButtons"; // استيراد الأزرار الجديدة
 
 export default async function AdminDashboard() {
   const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
@@ -23,8 +23,8 @@ export default async function AdminDashboard() {
   const pendingLeaves = await db.leaveRequest.findMany({
     where: { status: "Pending" },
     include: { employee: true },
-    orderBy: { createdAt: 'desc' }
-  });
+    orderBy: { createdAt: 'asc' } // عرض الأقدم أولاً
+  }) as any; // وضعنا as any لتفادي كاش البريزما
   
   const todaySignUps = employees.filter(e => e.attendances.length > 0).length;
 
@@ -60,15 +60,40 @@ export default async function AdminDashboard() {
            </div>
         </div>
 
-        {/* 👈 قسم طلبات الإجازة الجديد */}
+        {/* قسم طلبات الإجازة المعلقة (يظهر فقط إذا كان هناك طلبات) */}
         {pendingLeaves.length > 0 && (
-          <div className="mb-10">
-            <h2 className="text-lg font-black text-amber-600 mb-4 flex items-center gap-2">
-              <CalendarDays size={20} /> طلبات إجازة تنتظر الموافقة ({pendingLeaves.length})
+          <div className="mb-10 bg-amber-50 p-6 rounded-[2.5rem] border border-amber-200 shadow-sm animate-in fade-in zoom-in">
+            <h2 className="font-black text-amber-700 mb-6 flex items-center gap-2 text-xl">
+              <span className="relative flex h-3 w-3 mr-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+              </span>
+              لديك ({pendingLeaves.length}) طلبات إجازة تنتظر القرار!
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {pendingLeaves.map((leave: any) => (
-                <LeaveRequestCard key={leave.id} leave={leave} />
+                <div key={leave.id} className="bg-white p-5 rounded-3xl shadow-sm border border-amber-100">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-black text-slate-800 text-lg">{leave.employee.name}</p>
+                      <p className="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-1 rounded-lg w-fit mt-1">{leave.type}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 text-xs font-bold text-slate-500 space-y-1">
+                    <p>📅 من: {new Date(leave.startDate).toLocaleDateString('ar-EG')}</p>
+                    <p>📅 إلى: {new Date(leave.endDate).toLocaleDateString('ar-EG')}</p>
+                  </div>
+
+                  {leave.reason && (
+                    <p className="mt-3 text-[10px] text-slate-400 bg-slate-50 p-2 rounded-lg italic">
+                      " {leave.reason} "
+                    </p>
+                  )}
+
+                  <LeaveActionButtons leaveId={leave.id} />
+                </div>
               ))}
             </div>
           </div>
