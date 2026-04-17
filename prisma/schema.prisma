@@ -65,6 +65,7 @@ model Attendance {
   status        String?   
   
   requiredHours Int      @default(10) 
+  duration      Float    @default(0)
   overtime      Float    @default(0)
 
   employeeId    Int
