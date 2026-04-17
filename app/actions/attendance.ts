@@ -95,91 +95,80 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
   }
 }
 
+// أضف هذه الدالة في نهاية ملف app/actions/attendance.ts
+
 export async function checkOutAction(code: string, lat: number, lng: number, deviceId: string) {
   try {
-    // 1. Find employee and validate device
     const employee = await db.employee.findUnique({
       where: { code },
-      include: { branch: true },
+      include: { branch: true }
     });
 
     if (!employee) return { error: "كود الموظف غير صحيح" };
-    if (!employee.deviceId) return { error: "حسابك غير مفعل بعد." };
-    if (employee.deviceId !== deviceId) return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
+    if (employee.deviceId !== deviceId) return { error: "عذراً، هذا ليس جهازك المسجل!" };
 
-    // 2. Validate location
+    // 1. التحقق من الموقع (نفس منطق الحضور لضمان عدم الانصراف من المنزل)
     let isNearAnyAllowedBranch = false;
-    let distanceMsg = "";
-
     if (employee.isAnyBranch) {
       const allBranches = await db.branch.findMany();
-      if (allBranches.length === 0) return { error: "لا يوجد فروع مسجلة في النظام" };
       for (const b of allBranches) {
         if (getDistance(lat, lng, b.latitude, b.longitude) <= (employee.allowDist || 50)) {
-          isNearAnyAllowedBranch = true;
-          break;
+          isNearAnyAllowedBranch = true; break;
         }
       }
     } else if (employee.branch) {
-      const dist = getDistance(lat, lng, employee.branch.latitude, employee.branch.longitude);
-      distanceMsg = `(المسافة: ${Math.round(dist)} متر)`;
-      if (dist <= (employee.allowDist || 50)) {
+      if (getDistance(lat, lng, employee.branch.latitude, employee.branch.longitude) <= (employee.allowDist || 50)) {
         isNearAnyAllowedBranch = true;
       }
-    } else {
-      return { error: "لم يتم ربط هذا الموظف بأي فرع في الإعدادات" };
     }
 
-    if (!isNearAnyAllowedBranch) {
-      return { error: `أنت خارج النطاق الجغرافي للعمل ${distanceMsg}` };
-    }
+    if (!isNearAnyAllowedBranch) return { error: "أنت خارج نطاق الفرع! لا يمكنك تسجيل الانصراف من هنا." };
 
-    // 3. Find today's attendance record
+    // 2. البحث عن سجل حضور اليوم
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const attendance = await db.attendance.findFirst({
-      where: { employeeId: employee.id, date: today },
+      where: { employeeId: employee.id, date: today }
     });
 
-    if (!attendance) {
-      return { error: "لم تقم بتسجيل الحضور اليوم، لا يمكنك تسجيل الانصراف" };
-    }
-    if (attendance.checkOut) {
-      return { error: "لقد قمت بتسجيل الانصراف بالفعل اليوم!" };
-    }
-     if (!attendance.checkIn) {
-      return { error: "خطأ: مسجل في الحضور ولكن لا يوجد وقت دخول!" };
-    }
+    if (!attendance) return { error: "لم تقم بتسجيل الحضور اليوم لتسجيل الانصراف!" };
+    if (attendance.checkOut) return { error: "لقد قمت بتسجيل الانصراف مسبقاً اليوم!" };
+    if (!attendance.checkIn) return { error: "يوجد خطأ في سجل حضورك." };
 
-
-    // 4. Calculate work duration and overtime
+    // 3. الحسابات المالية الدقيقة (مدة العمل والإضافي)
     const now = new Date();
     const checkInTime = new Date(attendance.checkIn);
-    // diff in milliseconds
-    const workDurationMs = now.getTime() - checkInTime.getTime();
-    // diff in hours (float)
-    const workDurationHours = workDurationMs / (1000 * 60 * 60);
+    
+    // حساب الفرق بالمللي ثانية ثم تحويله لساعات (أرقام عشرية مثل 8.5 ساعات)
+    const diffInMs = now.getTime() - checkInTime.getTime();
+    const durationHours = diffInMs / (1000 * 60 * 60);
 
-    const overtime = Math.max(0, workDurationHours - (attendance.requiredHours || 10));
+    // حساب الإضافي (لو اشتغل أكتر من المطلوب منه)
+    let overtime = 0;
+    if (durationHours > attendance.requiredHours) {
+      overtime = durationHours - attendance.requiredHours;
+    }
 
-    // 5. Update attendance record
+    // 4. تحديث سجل قاعدة البيانات
     await db.attendance.update({
       where: { id: attendance.id },
       data: {
         checkOut: now,
         latOut: lat,
         lngOut: lng,
-        duration: workDurationHours,
-        overtime: overtime,
-      },
+        duration: parseFloat(durationHours.toFixed(2)), // تقريب لرقمين عشريين
+        overtime: parseFloat(overtime.toFixed(2)),
+      }
     });
-    
+
+    revalidatePath("/portal");
     revalidatePath("/admin");
-    return { success: `تم تسجيل انصرافك بنجاح!` };
+    
+    return { success: `تم الانصراف! مدة العمل: ${durationHours.toFixed(1)} ساعة` };
 
   } catch (error: any) {
-    console.error("Check-out Error:", error);
-    return { error: `خطأ تقني: ${error.message || "حدث خطأ في قاعدة البيانات"}` };
+    console.error("Checkout Error:", error);
+    return { error: `خطأ تقني: ${error.message}` };
   }
 }
