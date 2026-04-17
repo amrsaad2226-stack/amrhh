@@ -3,24 +3,42 @@ import db from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 export async function addEmployee(data: any) {
-  const { name, code, password, department, dailySalary, offDay } = data;
-
   try {
+    // 1. استخراج رقم الفرع بشكل آمن ومضمون 100%
+    let safeBranchId = null;
+    if (data.branchType !== "OPEN" && data.branchId) {
+      safeBranchId = parseInt(data.branchId, 10);
+      if (isNaN(safeBranchId)) safeBranchId = null;
+    }
+
+    // 2. الحفظ في قاعدة البيانات
     await db.employee.create({
       data: {
-        name,
-        code,
-        password,
-        department,
-        dailySalary: parseFloat(dailySalary),
-        offDay,
-      },
+        code: data.code,
+        name: data.name,
+        password: data.password,
+        department: data.department,
+        dailySalary: parseFloat(data.dailySalary) || 0,
+        overtimeRate: parseFloat(data.overtimeRate || "1"),
+        
+        // 👈 هذا هو الجزء الذي تم إصلاحه وتأمينه
+        isAnyBranch: data.branchType === "OPEN",
+        branchId: safeBranchId, 
+        
+        // المواعيد والإجازات
+        offDay: data.offDay,
+        offDayHours: parseInt(data.offDayHours || "0"),
+        timeIn: data.timeIn,
+        timeOut: data.timeOut,
+        allowDist: parseInt(data.allowDist || "50"),
+      }
     });
+    
     revalidatePath("/admin");
     return { success: true };
-  } catch (error) {
-    console.log(error);
-    return { error: "فشل إضافة الموظف" };
+  } catch (error: any) {
+    console.error("Error adding employee:", error);
+    return { error: "فشل إضافة الموظف. تأكد أن الكود غير مكرر." };
   }
 }
 
