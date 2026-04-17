@@ -3,9 +3,9 @@ import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { logoutEmployee } from "@/app/actions/auth";
-import { LogOut, Smartphone, Copy, CheckCircle2 } from "lucide-react";
+import { LogOut, Smartphone, CheckCircle2 } from "lucide-react";
 import PunchButtons from "./PunchButtons";
-import CopyIdSection from "./CopyIdSection"; // سننشئ هذا المكون الصغير الآن
+import CopyIdSection from "./CopyIdSection"; // 1. تأكد من وجود هذا الملف في نفس المجلد
 
 export default async function EmployeePortal() {
   const cookieStore = await cookies();
@@ -20,10 +20,8 @@ export default async function EmployeePortal() {
 
   if (!employee) redirect("/portal/login");
 
-  // 1. التحقق هل الموبايل مفعل؟
   const isDeviceActivated = !!employee.deviceId;
 
-  // 2. التحقق من حالة الحضور اليوم (للموظف المفعل فقط)
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayAttendance = employee.attendances.find(a => a.date.getTime() === today.getTime());
@@ -47,9 +45,7 @@ export default async function EmployeePortal() {
           </form>
         </div>
 
-        {/* 👈 الجزء الذكي: هل هو مفعل أم يحتاج تفعيل؟ */}
         {!isDeviceActivated ? (
-          // شاشة التفعيل (تظهر للموظف الجديد فقط)
           <div className="bg-blue-600 p-8 rounded-[2.5rem] text-white shadow-xl shadow-blue-100 text-center animate-in fade-in zoom-in duration-500">
              <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Smartphone size={32} />
@@ -58,16 +54,14 @@ export default async function EmployeePortal() {
              <p className="text-blue-100 text-sm mb-8 leading-relaxed">
                حسابك غير مرتبط بجهاز حالياً. يرجى نسخ الرمز أدناه وإرساله للمدير لتفعيل بصمتك.
              </p>
-             
-             {/* مكون النسخ الذي سننشئه */}
              <CopyIdSection /> 
           </div>
         ) : (
-          // شاشة البصمة (تظهر بمجرد أن يقوم المدير بالتفعيل)
           <div className="animate-in slide-in-from-bottom duration-700">
              <div className="bg-white p-6 rounded-[2rem] border-2 border-green-50 mb-6 flex items-center gap-3">
                 <div className="bg-green-100 text-green-600 p-2 rounded-full"><CheckCircle2 size={16}/></div>
-                <p className="text-green-700 text-xs font-bold font-sans">الجهاز مسجل: {employee.deviceId.substring(0, 10)}...</p>
+                {/* 2. تم إضافة علامة ? هنا لحل خطأ الـ null 👇 */}
+                <p className="text-green-700 text-[10px] font-bold font-sans">الجهاز مسجل: {employee.deviceId?.substring(0, 10)}...</p>
              </div>
 
              <PunchButtons 
@@ -77,7 +71,7 @@ export default async function EmployeePortal() {
              />
              
              <div className="mt-8">
-               <h3 className="text-slate-700 font-bold mb-4 px-2 italic text-sm">سجل آخر عملياتك:</h3>
+               <h3 className="text-slate-700 font-bold mb-4 px-2 italic text-sm text-right">سجل آخر عملياتك:</h3>
                <div className="space-y-3">
                  {employee.attendances.slice(0, 3).map(att => (
                    <div key={att.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
@@ -92,7 +86,6 @@ export default async function EmployeePortal() {
              </div>
           </div>
         )}
-
       </div>
     </div>
   );
