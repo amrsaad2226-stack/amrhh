@@ -4,9 +4,10 @@ import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { logoutEmployee } from "@/app/actions/auth";
-import { LogOut, Smartphone, CheckCircle2, Clock, CalendarDays, DollarSign } from "lucide-react";
+import { LogOut, Clock, Send } from "lucide-react";
 import PunchButtons from "./PunchButtons";
 import CopyIdSection from "./CopyIdSection";
+import LeaveRequestForm from "./_components/LeaveRequestForm";
 
 export default async function EmployeePortal() {
   const cookieStore = await cookies();
@@ -16,28 +17,27 @@ export default async function EmployeePortal() {
 
   const employee = await db.employee.findUnique({
     where: { id: parseInt(empId) },
-    include: { attendances: { orderBy: { checkIn: 'desc' }, take: 20 } }
-  });
+    include: { 
+      attendances: { orderBy: { checkIn: 'desc' }, take: 10 },
+      // @ts-ignore: Ignore cached Prisma types
+      leaveRequests: { orderBy: { createdAt: 'desc' }, take: 5 }
+    }
+  }) as any;
 
   if (!employee) redirect("/portal/login");
 
-  // تحديد الحالة: هل الموظف داخل العمل الآن؟
-  const lastAttendance = employee.attendances[0];
+  const lastAttendance = employee.attendances && employee.attendances[0];
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
-  // حساب إحصائيات سريعة
-  const totalOvertime = employee.attendances.reduce((acc, curr) => acc + (curr.overtime || 0), 0);
-  const presentDays = new Set(employee.attendances.map(a => a.date.toDateString())).size;
-
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-right" dir="rtl">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
       <div className="max-w-xl mx-auto">
         
-        {/* Header الاحترافي */}
+        {/* Header */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-black text-slate-800">{employee.name}</h1>
-            <p className="text-slate-400 text-xs font-bold tracking-widest uppercase">قسم {employee.department} | كود {employee.code}</p>
+            <p className="text-slate-400 text-xs font-bold uppercase">قسم {employee.department}</p>
           </div>
           <form action={logoutEmployee}>
             <button className="bg-red-50 text-red-500 p-4 rounded-2xl hover:bg-red-100 transition-all">
@@ -50,64 +50,54 @@ export default async function EmployeePortal() {
           <CopyIdSection />
         ) : (
           <>
-            {/* عرض بصمة الجهاز المعتمدة */}
-            <div className="bg-green-600 p-4 rounded-2xl mb-6 flex items-center justify-between text-white shadow-lg shadow-green-100">
-               <div className="flex items-center gap-3">
-                  <div className="bg-white/20 p-2 rounded-lg"><Smartphone size={20} /></div>
-                  <div className="text-[10px] font-bold">بصمة الجهاز المعتمدة: <br/> <span className="font-mono text-[9px] opacity-80">{employee.deviceId}</span></div>
-               </div>
-               <CheckCircle2 size={24} className="opacity-50" />
+            {/* زر طلب إجازة */}
+            <div className="mb-6">
+               <LeaveRequestForm employeeId={employee.id} />
             </div>
 
             {/* أزرار الحضور والانصراف */}
-            <PunchButtons 
-              employeeCode={employee.code} 
-              isCurrentlyIn={isCurrentlyIn} 
-            />
+            <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
 
-            {/* كروت الإحصائيات */}
-            <div className="grid grid-cols-3 gap-3 my-8">
-               <div className="bg-white p-4 rounded-3xl border border-slate-100 text-center">
-                  <CalendarDays size={20} className="mx-auto text-blue-500 mb-1" />
-                  <p className="text-[9px] text-slate-400 font-bold">أيام الحضور</p>
-                  <p className="text-lg font-black text-slate-800">{presentDays}</p>
-               </div>
-               <div className="bg-white p-4 rounded-3xl border border-slate-100 text-center">
-                  <Clock size={20} className="mx-auto text-amber-500 mb-1" />
-                  <p className="text-[9px] text-slate-400 font-bold">الإضافي</p>
-                  <p className="text-lg font-black text-slate-800">{totalOvertime.toFixed(1)} س</p>
-               </div>
-               <div className="bg-white p-4 rounded-3xl border border-slate-100 text-center">
-                  <DollarSign size={20} className="mx-auto text-green-500 mb-1" />
-                  <p className="text-[9px] text-slate-400 font-bold">الراتب اليومي</p>
-                  <p className="text-lg font-black text-slate-800">{employee.dailySalary}</p>
-               </div>
-            </div>
+            {/* متابعة طلبات الإجازة */}
+            {employee.leaveRequests && employee.leaveRequests.length > 0 && (
+              <div className="mt-8">
+                <h3 className="font-black text-slate-700 mb-4 flex items-center gap-2 text-sm">
+                  <Send size={16} className="text-blue-600" /> حالة طلبات الإجازة
+                </h3>
+                <div className="space-y-3">
+                  {employee.leaveRequests.map((leave: any) => (
+                    <div key={leave.id} className="bg-white p-4 rounded-2xl border border-slate-50 flex justify-between items-center shadow-sm">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">{leave.type}</p>
+                        <p className="text-[10px] text-slate-400">من {new Date(leave.startDate).toLocaleDateString('ar-EG')} إلى {new Date(leave.endDate).toLocaleDateString('ar-EG')}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
+                        leave.status === 'Approved' ? 'bg-green-100 text-green-700' : 
+                        leave.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {leave.status === 'Approved' ? 'تمت الموافقة' : leave.status === 'Rejected' ? 'مرفوض' : 'قيد الانتظار'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            {/* سجل العمليات التفصيلي */}
-            <h3 className="font-black text-slate-700 mb-4 flex items-center gap-2">
-              <Clock size={18} className="text-blue-600" /> سجل حركاتك الأخيرة
+            {/* سجل العمليات */}
+            <h3 className="font-black text-slate-700 mt-8 mb-4 flex items-center gap-2 text-sm">
+              <Clock size={16} className="text-blue-600" /> سجل حركاتك الأخيرة
             </h3>
-            <div className="space-y-3 pb-10">
-              {employee.attendances.map(att => (
-                <div key={att.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex justify-between items-center shadow-sm">
+            <div className="space-y-3">
+              {employee.attendances && employee.attendances.map((att: any) => (
+                <div key={att.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center shadow-sm">
                   <div>
-                    <p className="text-xs font-black text-slate-800 mb-1">{att.date.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                    <div className="flex gap-4">
-                       <div className="text-[10px] text-green-600 font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                          دخول: {att.checkIn ? att.checkIn.toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' }) : "--"}
-                       </div>
-                       {att.checkOut && (
-                         <div className="text-[10px] text-red-600 font-bold flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                            خروج: {att.checkOut.toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' })}
-                         </div>
-                       )}
+                    <p className="text-xs font-black text-slate-800 mb-1">{att.date.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}</p>
+                    <div className="flex gap-3 text-[10px] font-bold text-slate-400">
+                       <span className="text-green-600">دخول: {att.checkIn?.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo'})}</span>
+                       {att.checkOut && <span className="text-red-600">خروج: {att.checkOut.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo'})}</span>}
                     </div>
                   </div>
                   <div className="text-left">
-                     <p className="text-[10px] text-slate-400 font-bold uppercase">المدة</p>
                      <p className="font-black text-blue-600 text-sm">{att.duration?.toFixed(1) || 0} س</p>
                   </div>
                 </div>

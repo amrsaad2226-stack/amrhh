@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -47,7 +48,7 @@ model Employee {
   
   createdAt        DateTime @default(now())
   attendances      Attendance[]
-  leaves           LeaveRequest[] // <-- العلاقة المضافة
+  leaveRequests    LeaveRequest[] // 👈 تم التصحيح هنا
 }
 
 // 3. جدول سجلات الحضور والانصراف اليومية
