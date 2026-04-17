@@ -1,42 +1,27 @@
+
 'use client';
 
 import { useState } from 'react';
-import { requestLeave } from '@/app/actions/leaves';
+// الخطوة 2: تحديث الاستيراد إلى المسار النسبي الصحيح
+import { requestLeave } from '../../actions/leaves';
 import { Calendar, Send } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function LeaveRequestForm({ employeeId }: { employeeId: number }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
+  // استخدام Server Action مباشرة مع useFormState 
+  const clientAction = async (formData: FormData) => {
+    const tid = toast.loading("جاري إرسال الطلب...");
 
-    const formData = new FormData(event.currentTarget);
-    const data = {
-      startDate: formData.get('startDate') as string,
-      endDate: formData.get('endDate') as string,
-      type: formData.get('type') as string,
-      reason: formData.get('reason') as string,
-    };
+    const result = await requestLeave(employeeId, formData);
 
-    if (!data.startDate || !data.endDate || !data.type) {
-      setError('يرجى ملء جميع الحقول المطلوبة.');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      await requestLeave(employeeId, data);
-      setSuccess(true);
-      (event.target as HTMLFormElement).reset();
-    } catch (err: any) {
-      setError('حدث خطأ أثناء إرسال الطلب.');
-    } finally {
-      setLoading(false);
+    if (result?.error) {
+      toast.error(result.error, { id: tid });
+    } else {
+      toast.success(result.success, { id: tid });
+      // إعادة تعيين الفورم عند النجاح
+      const form = document.getElementById('leave-form') as HTMLFormElement;
+      form.reset();
     }
   };
 
@@ -47,18 +32,7 @@ export function LeaveRequestForm({ employeeId }: { employeeId: number }) {
         طلب إجازة جديد
       </h3>
 
-      {success && (
-        <div className="bg-green-100 border border-green-200 text-green-800 p-4 rounded-2xl mb-4 text-center font-bold">
-          تم إرسال طلبك بنجاح!
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-100 border border-red-200 text-red-800 p-4 rounded-2xl mb-4 text-center font-bold">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form id="leave-form" action={clientAction} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="startDate" className="block text-sm font-bold text-slate-600 mb-2">تاريخ البدء</label>
@@ -74,9 +48,10 @@ export function LeaveRequestForm({ employeeId }: { employeeId: number }) {
           <label htmlFor="type" className="block text-sm font-bold text-slate-600 mb-2">نوع الإجازة</label>
           <select id="type" name="type" required className="w-full p-4 bg-slate-50 border rounded-2xl outline-none focus:border-blue-500 appearance-none">
             <option value="">اختر النوع...</option>
-            <option value="Vacation">سنوية</option>
+            <option value="Annual">سنوية</option>
             <option value="Sick">مرضية</option>
             <option value="Emergency">طارئة</option>
+            <option value="Unpaid">بدون أجر</option>
           </select>
         </div>
 
@@ -86,16 +61,13 @@ export function LeaveRequestForm({ employeeId }: { employeeId: number }) {
         </div>
 
         <div>
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full px-8 py-4 rounded-2xl font-black shadow-lg transition-all flex items-center justify-center gap-2 text-white ${
-              loading ? 'bg-slate-400' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
-            }`}
-          >
-            <Send size={18} />
-            {loading ? 'جاري الإرسال...' : 'إرسال الطلب'}
-          </button>
+            <button
+               type="submit"
+               className={`w-full px-8 py-4 rounded-2xl font-black shadow-lg transition-all flex items-center justify-center gap-2 text-white bg-blue-600 hover:bg-blue-700 shadow-blue-100`}
+             >
+               <Send size={18} />
+               إرسال الطلب
+             </button>
         </div>
       </form>
     </div>

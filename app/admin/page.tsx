@@ -1,8 +1,10 @@
+
 // app/admin/page.tsx
 import db from "@/lib/db";
-import { Users, MapPin, Clock, CheckCircle } from "lucide-react";
+import { Users, MapPin, Clock, CheckCircle, CalendarDays } from "lucide-react";
 import AddEmployeeForm from "./AddEmployeeForm";
 import ActivateDeviceBtn from "./ActivateDeviceBtn";
+import LeaveRequestCard from "./LeaveRequestCard"; // 👈 استيراد المكون الجديد
 
 export default async function AdminDashboard() {
   const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
@@ -15,6 +17,13 @@ export default async function AdminDashboard() {
   const liveSessions = await db.attendance.findMany({
     where: { date: today, checkOut: null },
     include: { employee: true }
+  });
+
+  // جلب طلبات الإجازة المعلقة
+  const pendingLeaves = await db.leaveRequest.findMany({
+    where: { status: "Pending" },
+    include: { employee: true },
+    orderBy: { createdAt: 'desc' }
   });
   
   const todaySignUps = employees.filter(e => e.attendances.length > 0).length;
@@ -50,6 +59,20 @@ export default async function AdminDashboard() {
               <p className="text-2xl font-black">{branches.length}</p>
            </div>
         </div>
+
+        {/* 👈 قسم طلبات الإجازة الجديد */}
+        {pendingLeaves.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-lg font-black text-amber-600 mb-4 flex items-center gap-2">
+              <CalendarDays size={20} /> طلبات إجازة تنتظر الموافقة ({pendingLeaves.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pendingLeaves.map((leave: any) => (
+                <LeaveRequestCard key={leave.id} leave={leave} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* المراقب الحي */}
         <div className="mb-10">
