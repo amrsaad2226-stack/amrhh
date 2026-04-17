@@ -11,21 +11,15 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     });
 
     if (!employee) return { error: "كود الموظف غير صحيح" };
+    if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
+    if (employee.deviceId !== deviceId) return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
 
-    if (!employee.deviceId) {
-      return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
-    }
-    if (employee.deviceId !== deviceId) {
-      return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
-    }
-
+    // 1. Location check
     let isNearAnyAllowedBranch = false;
     let distanceMsg = "";
-
     if (employee.isAnyBranch) {
       const allBranches = await db.branch.findMany();
       if (allBranches.length === 0) return { error: "لا يوجد فروع مسجلة في النظام" };
-      
       for (const b of allBranches) {
         const dist = getDistance(lat, lng, b.latitude, b.longitude);
         if (dist <= (employee.allowDist || 50)) {
@@ -47,57 +41,45 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       return { error: `أنت خارج النطاق الجغرافي للعمل ${distanceMsg}` };
     }
 
-    // -- TIMEZONE FIX: Use Cairo time to define "today" --
-    const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
-    today.setHours(0, 0, 0, 0);
-
-    const existingAttendance = await db.attendance.findFirst({
-      where: { employeeId: employee.id, date: today },
+    // 2. Check for an active (non-checked-out) session
+    const activeSession = await db.attendance.findFirst({
+      where: { 
+        employeeId: employee.id, 
+        checkOut: null 
+      }
     });
 
-    if (existingAttendance) {
-      return { error: "لقد قمت بتسجيل الحضور بالفعل اليوم!" };
+    if (activeSession) {
+      return { error: "أنت مسجل حضور بالفعل! يجب تسجيل الانصراف أولاً." };
     }
 
+    // 3. If no active session, create a new one
     const now = new Date();
-
-    // -- TIMEZONE FIX: Calculate status based on Cairo time --
-    const cairoTimeStr = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Africa/Cairo',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).format(now);
-    const status = cairoTimeStr > employee.timeIn ? "Late" : "Present";
-    
-    // -- TIMEZONE FIX: Use Cairo time to determine off-days --
-    const todayName = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'Africa/Cairo' }).format(now);
-    const isOffDay = employee.offDay === todayName;
-    const hoursNeeded = isOffDay ? (employee.offDayHours || 0) : (employee.dailyHours || 10);
+    const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
+    today.setHours(0, 0, 0, 0);
 
     await db.attendance.create({
       data: {
         employeeId: employee.id,
         date: today,
-        checkIn: now, // Store original UTC timestamp
+        checkIn: now,
         latIn: lat,
         lngIn: lng,
-        status: status,
-        requiredHours: hoursNeeded,
-        overtime: 0
+        requiredHours: employee.dailyHours || 8, 
+        status: "Present",
       },
     });
-
-    revalidatePath("/admin");
+    
     revalidatePath("/portal");
-    return { success: `تم تسجيل حضورك بنجاح! (${status === "Late" ? "متأخر ⚠️" : "في الموعد ✅"})` };
+    revalidatePath("/admin");
+
+    return { success: "تم تسجيل الدخول بنجاح ✅" };
 
   } catch (error: any) {
     console.error("Check-in Error:", error);
-    return { error: `خطأ تقني: ${error.message || "حدث خطأ في قاعدة البيانات"}` };
+    return { error: `خطأ تقني: ${error.message}` };
   }
 }
-
 
 export async function checkOutAction(code: string, lat: number, lng: number, deviceId: string) {
   try {
@@ -108,7 +90,8 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
 
     if (!employee) return { error: "كود الموظف غير صحيح" };
     if (employee.deviceId !== deviceId) return { error: "عذراً، هذا ليس جهازك المسجل!" };
-
+    
+    // Location check
     let isNearAnyAllowedBranch = false;
     if (employee.isAnyBranch) {
       const allBranches = await db.branch.findMany();
@@ -122,50 +105,40 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
         isNearAnyAllowedBranch = true;
       }
     }
-
     if (!isNearAnyAllowedBranch) return { error: "أنت خارج نطاق الفرع! لا يمكنك تسجيل الانصراف من هنا." };
 
-    // -- TIMEZONE FIX: Use Cairo time to find today's attendance record --
-    const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
-    today.setHours(0, 0, 0, 0);
-
-    const attendance = await db.attendance.findFirst({
-      where: { employeeId: employee.id, date: today }
+    // Find the last active session for the employee
+    const lastSession = await db.attendance.findFirst({
+      where: { 
+        employeeId: employee.id, 
+        checkOut: null 
+      },
+      orderBy: { checkIn: 'desc' }
     });
 
-    if (!attendance) return { error: "لم تقم بتسجيل الحضور اليوم لتسجيل الانصراف!" };
-    if (attendance.checkOut) return { error: "لقد قمت بتسجيل الانصراف مسبقاً اليوم!" };
-    if (!attendance.checkIn) return { error: "يوجد خطأ في سجل حضورك." };
+    if (!lastSession) return { error: "لا يوجد سجل حضور مفتوح حالياً." };
 
     const now = new Date();
-    const checkInTime = new Date(attendance.checkIn);
-    
+    const checkInTime = new Date(lastSession.checkIn!);
     const diffInMs = now.getTime() - checkInTime.getTime();
     const durationHours = diffInMs / (1000 * 60 * 60);
 
-    let overtime = 0;
-    if (durationHours > attendance.requiredHours) {
-      overtime = durationHours - attendance.requiredHours;
-    }
-
     await db.attendance.update({
-      where: { id: attendance.id },
+      where: { id: lastSession.id },
       data: {
-        checkOut: now, // Store original UTC timestamp
+        checkOut: now,
         latOut: lat,
         lngOut: lng,
         duration: parseFloat(durationHours.toFixed(2)),
-        overtime: parseFloat(overtime.toFixed(2)),
       }
     });
-
+    
     revalidatePath("/portal");
     revalidatePath("/admin");
-    
-    return { success: `تم الانصراف! مدة العمل: ${durationHours.toFixed(1)} ساعة` };
 
+    return { success: `تم تسجيل الانصراف بنجاح ✅` };
   } catch (error: any) {
-    console.error("Checkout Error:", error);
-    return { error: `خطأ تقني: ${error.message}` };
+     console.error("Checkout Error:", error);
+     return { error: `خطأ تقني: ${error.message}` };
   }
 }

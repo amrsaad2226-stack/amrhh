@@ -1,4 +1,3 @@
-
 // app/portal/page.tsx
 import db from "@/lib/db";
 import { cookies } from "next/headers";
@@ -16,24 +15,33 @@ export default async function EmployeePortal() {
 
   const employee = await db.employee.findUnique({
     where: { id: parseInt(empId) },
-    include: { attendances: { orderBy: { date: 'desc' }, take: 15 } }
+    include: { attendances: { orderBy: { date: 'desc' } } }
   });
 
   if (!employee) redirect("/portal/login");
 
   const isDeviceActivated = !!employee.deviceId;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayAttendance = employee.attendances.find(a => a.date.getTime() === today.getTime());
-  const hasCheckedIn = !!todayAttendance?.checkIn;
-  const hasCheckedOut = !!todayAttendance?.checkOut;
+  // Check for an active session (check-in without check-out)
+  const activeSession = employee.attendances.find(a => a.checkIn && !a.checkOut);
+
+  // Group attendances by date to display them neatly
+  const groupedAttendances = employee.attendances.reduce((acc: Record<string, { date: string; totalHours: number; sessions: any[] }>, curr) => {
+    const dateStr = curr.date.toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'long', day: 'numeric' });
+    if (!acc[dateStr]) {
+      acc[dateStr] = { date: dateStr, totalHours: 0, sessions: [] };
+    }
+    acc[dateStr].totalHours += curr.duration || 0;
+    acc[dateStr].sessions.push(curr);
+    return acc;
+  }, {});
+
+  const displayRows = Object.values(groupedAttendances);
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-right" dir="rtl">
       <div className="max-w-md mx-auto">
         
-        {/* Header الشخصي */}
         <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-black text-slate-800">{employee.name}</h1>
@@ -66,19 +74,34 @@ export default async function EmployeePortal() {
 
              <PunchButtons 
                employeeCode={employee.code} 
-               hasCheckedIn={hasCheckedIn} 
-               hasCheckedOut={hasCheckedOut} 
+               hasCheckedIn={!!activeSession} // Now based on active session, not today's first punch
+               hasCheckedOut={!activeSession} // If there's an active session, you can't check in again
              />
              
              <div className="mt-8">
                <h3 className="text-slate-700 font-bold mb-4 px-2 italic text-sm text-right">سجل آخر عملياتك:</h3>
-               <div className="space-y-3">
-                 {employee.attendances.slice(0, 3).map(att => (
-                   <div key={att.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                     <span className="text-slate-500 font-bold text-xs">{att.date.toLocaleDateString('ar-EG')}</span>
-                     <div className="flex gap-2">
-                        {att.checkIn && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-1 rounded-lg">حضور {att.checkIn.toLocaleTimeString('ar-EG', {timeZone: 'Africa/Cairo', hour:'2-digit', minute:'2-digit'})}</span>}
-                        {att.checkOut && <span className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-lg">انصراف {att.checkOut.toLocaleTimeString('ar-EG', {timeZone: 'Africa/Cairo', hour:'2-digit', minute:'2-digit'})}</span>}
+               <div className="space-y-4">
+                 {displayRows.slice(0, 5).map(day => (
+                   <div key={day.date} className="bg-white p-4 rounded-2xl border border-slate-100">
+                     <div className="flex justify-between items-center mb-3 pb-3 border-b border-slate-100">
+                        <span className="text-slate-800 font-black text-sm">{day.date}</span>
+                        <span className="text-blue-600 font-bold bg-blue-50 px-2 py-1 text-xs rounded-md">إجمالي: {day.totalHours.toFixed(1)} ساعة</span>
+                     </div>
+                     <div className="space-y-2">
+                      {day.sessions.map(att => (
+                        <div key={att.id} className="flex justify-between items-center text-xs">
+                           <div className="flex gap-2 font-mono">
+                              <span className="text-green-600 bg-green-50 px-2 py-1 rounded-md">
+                                {att.checkIn ? att.checkIn.toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' }) : "--:--"}
+                              </span>
+                              <span>-&gt;</span>
+                              <span className="text-red-600 bg-red-50 px-2 py-1 rounded-md">
+                                {att.checkOut ? att.checkOut.toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' }) : "جارية..."}
+                              </span>
+                           </div>
+                           <span className="text-slate-400 font-bold">({att.duration ? `${att.duration.toFixed(1)} س` : "-"})</span>
+                        </div>
+                      ))}
                      </div>
                    </div>
                  ))}
