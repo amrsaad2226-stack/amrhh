@@ -43,19 +43,28 @@ export default function PunchButtons({
     );
   };
 
-  if (hasCheckedIn && hasCheckedOut) return <div className="p-6 bg-slate-100 rounded-3xl text-center font-bold text-slate-500">تم اكتمال عمل اليوم 🎉</div>;
+  // 👈 التعديل يبدأ من هنا:
+  // إذا كان مسجل حضور ولم يسجل انصراف بعد (فترة عمل حالية)
+  if (hasCheckedIn && !hasCheckedOut) {
+    return (
+      <button 
+        onClick={() => handlePunch("OUT")} 
+        disabled={loading} 
+        className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white p-6 rounded-3xl font-black text-xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all"
+      >
+        <LogOut size={24} /> {loading ? "جاري المعالجة..." : "تسجيل الانصراف"}
+      </button>
+    );
+  }
 
+  // في أي حالة أخرى (لم يبدأ اليوم، أو أنهى فترة ويريد بدء فترة جديدة)
   return (
-    <div className="flex flex-col gap-4">
-      {hasCheckedIn ? (
-        <button onClick={() => handlePunch("OUT")} disabled={loading} className="w-full bg-red-600 text-white p-6 rounded-3xl font-black text-xl flex items-center justify-center gap-3">
-          <LogOut size={24} /> {loading ? "جاري المعالجة..." : "تسجيل الانصراف"}
-        </button>
-      ) : (
-        <button onClick={() => handlePunch("IN")} disabled={loading} className="w-full bg-green-600 text-white p-6 rounded-3xl font-black text-xl flex items-center justify-center gap-3">
-          <Fingerprint size={24} /> {loading ? "جاري المعالجة..." : "تسجيل الحضور"}
-        </button>
-      )}
-    </div>
+    <button 
+      onClick={() => handlePunch("IN")} 
+      disabled={loading} 
+      className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-3xl font-black text-xl flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all"
+    >
+      <Fingerprint size={24} /> {loading ? "جاري المعالgä..." : "تسجيل الحضور"}
+    </button>
   );
 }
