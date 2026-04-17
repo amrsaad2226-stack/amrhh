@@ -47,6 +47,7 @@ model Employee {
   
   createdAt        DateTime @default(now())
   attendances      Attendance[]
+  leaves           LeaveRequest[] // <-- العلاقة المضافة
 }
 
 // 3. جدول سجلات الحضور والانصراف اليومية
@@ -75,4 +76,17 @@ model Attendance {
 enum Role {
   ADMIN
   EMPLOYEE
+}
+
+// 4. نموذج طلبات الإجازة
+model LeaveRequest {
+  id           Int      @id @default(autoincrement())
+  employeeId   Int
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  startDate    DateTime
+  endDate      DateTime
+  type         String   // "Vacation", "Sick", "Emergency"
+  reason       String?
+  status       String   @default("Pending") // "Pending", "Approved", "Rejected"
+  createdAt    DateTime @default(now())
 }
