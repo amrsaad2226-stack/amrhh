@@ -1,1 +1,75 @@
-\"use client\";\n\nimport { useState } from \"react\";\nimport { checkOutAction } from \"@/app/actions/attendance\";\n\n// Simplified component for location fetching feedback\nconst LocationStatus = ({ status, error }: { status: string; error: string | null }) => (\n  <div className={`mt-4 p-3 rounded-md text-center ${error ? \'bg-red-100 text-red-700\' : \'bg-blue-100 text-blue-700\'}`}>\n    <p>{status}</p>\n    {error && <p className=\"text-sm\">{error}</p>}\n  </div>\n);\n\nexport default function CheckoutForm() {\n  const [code, setCode] = useState(\"\");\n  const [loading, setLoading] = useState(false);\n  const [message, setMessage] = useState<{ type: \'success\' | \'error\'; text: string } | null>(null);\n  const [locationStatus, setLocationStatus] = useState(\"\");\n  const [locationError, setLocationError] = useState<string | null>(null);\n\n  const getDeviceId = async () => {\n    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;\n    const platform = navigator.platform;\n    const hardwareConcurrency = navigator.hardwareConcurrency || \'unknown\';\n    return `${userAgent}-${platform}-${hardwareConcurrency}`;\n  };\n\n  const handleSubmit = (e: React.FormEvent) => {\n    e.preventDefault();\n    if (!code) {\n      setMessage({ type: \'error\', text: \"الرجاء إدخال كود الموظف\" });\n      return;\n    }\n\n    setLoading(true);\n    setMessage(null);\n    setLocationStatus(\"جاري طلب إحداثيات الموقع...\");\n    setLocationError(null);\n\n    navigator.geolocation.getCurrentPosition(\n      async (position) => {\n        const { latitude, longitude } = position.coords;\n        setLocationStatus(\"تم الحصول على الموقع بنجاح.\");\n        \n        try {\n          const deviceId = await getDeviceId();\n          const result = await checkOutAction(code, latitude, longitude, deviceId);\n\n          if (result.error) {\n            setMessage({ type: \'error\', text: result.error });\n          } else if (result.success) {\n            setMessage({ type: \'success\', text: result.success });\n            setCode(\"\"); // Clear input on success\n          }\n        } catch (err: any) {\n          setMessage({ type: \'error\', text: err.message || \"حدث خطأ غير متوقع.\" });\n        }\ finally {\n          setLoading(false);\n        }\n      },\n      (error) => {\n        console.error(\"Geolocation Error:\", error);\n        let errorMessage = \"فشل تحديد الموقع. تأكد من تفعيل الـ GPS والسماح للمتصفح بالوصول لموقعك.\";\n        if (error.code === 1) errorMessage = \"تم رفض الوصول للموقع. يرجى السماح بالوصول والمحاولة مرة أخرى.\";\n        if (error.code === 2) errorMessage = \"لا يمكن تحديد الموقع. قد تكون الشبكة أو الأقمار الصناعية غير متاحة.\";\n\n        setLocationError(errorMessage);\n        setLocationStatus(\"فشل تحديد الموقع\");\n        setMessage({ type: \'error\', text: errorMessage });\n        setLoading(false);\n      },\n      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }\n    );\n  };\n\n  return (\n    <form onSubmit={handleSubmit} className=\"space-y-6\">\n      <div>\n        <label htmlFor=\"employeeCode\" className=\"block text-sm font-medium text-gray-700 text-right\">\n          كود الموظف\n        </label>\n        <input\n          type=\"text\"\n          id=\"employeeCode\"\n          value={code}\n          onChange={(e) => setCode(e.target.value)}\n          className=\"mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-right\"\n          placeholder=\"أدخل الكود الخاص بك\"\n          dir=\"rtl\"\n        />\n      </div>\n\n      <button\n        type=\"submit\"\n        disabled={loading}\n        className=\"w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed\"\n      >\n        {loading ? \"جاري المعالجة...\" : \"تسجيل الانصراف\"}\n      </button>\n\n      {locationStatus && <LocationStatus status={locationStatus} error={locationError} />}\n\n      {message && (\n        <div\n          className={`mt-4 p-3 rounded-md text-center font-bold ${message.type === \'success\' ? \'bg-green-100 text-green-800\' : \'bg-red-100 text-red-800\'}`}>\n          {message.text}\n        </div>\n      )}\n    </form>\n  );\n}\n
+"use client";
+
+import { useState, useEffect } from "react";
+import { getDeviceId } from "@/lib/device";
+import { checkOutAction } from "@/app/actions/attendance";
+
+export default function CheckoutForm() {
+  const [status, setStatus] = useState("جاهز لتسجيل الانصراف");
+  const [loading, setLoading] = useState(false);
+  const [employeeCode, setEmployeeCode] = useState("");
+  const [deviceId, setDeviceId] = useState("");
+
+  useEffect(() => {
+    setDeviceId(getDeviceId());
+  },[]);
+
+  const handleCheckOut = () => {
+    if (!employeeCode) return alert("أدخل كود الموظف");
+    setLoading(true);
+    setStatus("جاري البحث عن أدق إشارة GPS...");
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+
+        if (accuracy > 60) {
+          setStatus(`الإشارة ضعيفة (${Math.round(accuracy)}م). قف في مكان مكشوف وأعد المحاولة.`);
+          setLoading(false);
+          return;
+        }
+
+        setStatus(`دقة جيدة (${Math.round(accuracy)}م). جاري تسجيل الانصراف...`);
+        const res = await checkOutAction(employeeCode, latitude, longitude, deviceId);
+        setStatus(res.error ? `❌ ${res.error}` : `✅ ${res.success}`);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Geolocation Error:", error.message);
+        setStatus("❌ فشل تحديد الموقع. تأكد من تفعيل الـ GPS");
+        setLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  };
+
+  return (
+    <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 max-w-sm mx-auto w-full text-center" dir="rtl">
+      <h2 className="text-2xl font-black mb-6 text-slate-800">بصمة الانصراف 🏃‍♂️</h2>
+      
+      <input
+        type="text"
+        placeholder="كود الموظف"
+        className="w-full p-4 border-2 border-slate-100 rounded-2xl text-center text-lg font-bold outline-none focus:border-red-500 transition-colors mb-4"
+        onChange={(e) => setEmployeeCode(e.target.value)}
+      />
+
+      <div className={`p-4 rounded-2xl text-sm font-bold mb-6 transition-all ${
+        status.includes("✅") ? "bg-green-50 text-green-700" :
+        status.includes("❌") ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"
+      }`}>
+        {status}
+      </div>
+
+      <button
+        onClick={handleCheckOut}
+        disabled={loading}
+        className={`w-full py-5 text-white rounded-2xl font-black text-xl shadow-lg active:scale-95 transition-all ${
+          loading ? "bg-slate-300" : "bg-gradient-to-r from-red-500 to-rose-600 hover:shadow-red-200"
+        }`}
+      >
+        {loading ? "إنتظر..." : "تسجيل الانصراف الآن"}
+      </button>
+    </div>
+  );
+}
