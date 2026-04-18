@@ -1,10 +1,10 @@
 
-// app/admin/page.tsx
+import Link from "next/link"; // 👈 أضفنا هذا
 import db from "@/lib/db";
-import { Users, MapPin, Clock, CheckCircle, CalendarDays } from "lucide-react";
+import { Users, MapPin, Clock, CheckCircle, CalendarDays, Building2, FileSpreadsheet, ListOrdered } from "lucide-react"; // 👈 أضفنا 3 أيقونات في الآخر
 import AddEmployeeForm from "./AddEmployeeForm";
 import ActivateDeviceBtn from "./ActivateDeviceBtn";
-import LeaveActionButtons from "./LeaveActionButtons"; // استيراد الأزرار الجديدة
+import LeaveActionButtons from "./LeaveActionButtons";
 
 export default async function AdminDashboard() {
   const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
@@ -19,21 +19,53 @@ export default async function AdminDashboard() {
     include: { employee: true }
   });
 
-  // جلب طلبات الإجازة المعلقة
   const pendingLeaves = await db.leaveRequest.findMany({
     where: { status: "Pending" },
     include: { employee: true },
-    orderBy: { createdAt: 'asc' } // عرض الأقدم أولاً
-  }) as any; // وضعنا as any لتفادي كاش البريزما
+    orderBy: { createdAt: 'asc' } 
+  }) as any;
   
   const todaySignUps = employees.filter(e => e.attendances.length > 0).length;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-10 font-sans text-right" dir="rtl">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-10">
+        
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <h1 className="text-3xl font-black text-slate-800">لوحة الإدارة</h1>
           <AddEmployeeForm branches={branches} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+          <Link href="/admin/branches" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group flex items-center gap-4 active:scale-95">
+            <div className="bg-blue-50 text-blue-600 p-4 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <Building2 size={24} />
+            </div>
+            <div>
+              <h3 className="font-black text-slate-800 text-lg">إدارة الفروع</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">مواقع العمل والإحداثيات</p>
+            </div>
+          </Link>
+
+          <Link href="/admin/reports" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all group flex items-center gap-4 active:scale-95">
+            <div className="bg-green-50 text-green-600 p-4 rounded-2xl group-hover:bg-green-600 group-hover:text-white transition-colors">
+              <FileSpreadsheet size={24} />
+            </div>
+            <div>
+              <h3 className="font-black text-slate-800 text-lg">مسيرات الرواتب</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">الرواتب وحساب الإضافي</p>
+            </div>
+          </Link>
+
+          <Link href="/admin/logs" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all group flex items-center gap-4 active:scale-95">
+            <div className="bg-purple-50 text-purple-600 p-4 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-colors">
+              <ListOrdered size={24} />
+            </div>
+            <div>
+              <h3 className="font-black text-slate-800 text-lg">سجل الحركات</h3>
+              <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-wider">تاريخ الحضور التفصيلي</p>
+            </div>
+          </Link>
         </div>
 
         {/* الكروت */}
@@ -60,7 +92,6 @@ export default async function AdminDashboard() {
            </div>
         </div>
 
-        {/* قسم طلبات الإجازة المعلقة (يظهر فقط إذا كان هناك طلبات) */}
         {pendingLeaves.length > 0 && (
           <div className="mb-10 bg-amber-50 p-6 rounded-[2.5rem] border border-amber-200 shadow-sm animate-in fade-in zoom-in">
             <h2 className="font-black text-amber-700 mb-6 flex items-center gap-2 text-xl">
@@ -99,7 +130,6 @@ export default async function AdminDashboard() {
           </div>
         )}
 
-        {/* المراقب الحي */}
         <div className="mb-10">
            <h2 className="font-bold mb-4 flex items-center gap-2 underline decoration-green-500">🔴 مباشر الآن في العمل</h2>
            <div className="flex flex-wrap gap-2">
@@ -113,7 +143,6 @@ export default async function AdminDashboard() {
            </div>
         </div>
 
-        {/* جدول الموظفين */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
            <table className="w-full text-right">
               <thead className="bg-slate-50 text-slate-500 text-sm">
