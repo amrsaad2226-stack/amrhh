@@ -1,3 +1,4 @@
+
 // app/actions/admin.ts
 "use server";
 
@@ -82,34 +83,59 @@ export async function deleteEmployee(id: number) {
   revalidatePath("/admin");
 }
 
-// 5. جلب بيانات الرواتب (للتقارير)
 export async function getPayrollData(month: number, year: number) {
   const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0);
+  const endDate = new Date(year, month, 0); 
 
   const employees = await db.employee.findMany({
     include: {
       attendances: {
         where: {
-          date: { gte: startDate, lte: endDate }
+          date: { gte: startDate, lte: endDate },
+          checkOut: { not: null } 
         }
       }
     }
   });
 
   return employees.map(emp => {
-    const totalDays = emp.attendances.length;
-    const totalOvertime = emp.attendances.reduce((sum, att) => sum + (att.overtime || 0), 0);
-    const baseSalary = totalDays * emp.dailySalary;
-    const hourlyRate = emp.dailySalary / (emp.dailyHours || 8);
-    const overtimePay = totalOvertime * hourlyRate * (emp.overtimeRate || 1);
-    
+    const dailyLogs: Record<string, number> = {};
+
+    emp.attendances.forEach(att => {
+      const dateKey = att.date.toISOString().split('T')[0]; 
+      if (!dailyLogs[dateKey]) dailyLogs[dateKey] = 0;
+      dailyLogs[dateKey] += (att.duration || 0); 
+    });
+
+    const uniqueDaysPresent = Object.keys(dailyLogs).length; 
+    const requiredDailyHours = emp.dailyHours || 8;
+    const hourlyRate = emp.dailySalary / requiredDailyHours; 
+
+    let totalOvertimeHours = 0;
+    let totalShortfallHours = 0; 
+
+    Object.values(dailyLogs).forEach(totalHoursWorked => {
+      if (totalHoursWorked > requiredDailyHours) {
+        totalOvertimeHours += (totalHoursWorked - requiredDailyHours);
+      } else if (totalHoursWorked < requiredDailyHours) {
+        totalShortfallHours += (requiredDailyHours - totalHoursWorked);
+      }
+    });
+
+    const baseSalary = uniqueDaysPresent * emp.dailySalary; 
+    const overtimePay = totalOvertimeHours * hourlyRate * (emp.overtimeRate || 1); 
+    const deductionAmount = totalShortfallHours * hourlyRate; 
+
+    const netSalary = Math.round(baseSalary + overtimePay - deductionAmount);
+
     return {
       id: emp.id,
       name: emp.name,
-      totalDays,
-      totalOvertimeHours: totalOvertime.toFixed(1), // ✅ الاسم الجديد المتوافق
-      netSalary: Math.round(baseSalary + overtimePay)
+      totalDays: uniqueDaysPresent,
+      totalOvertimeHours: totalOvertimeHours.toFixed(1),
+      totalShortfallHours: totalShortfallHours.toFixed(1),
+      deductionAmount: Math.round(deductionAmount),
+      netSalary: netSalary > 0 ? netSalary : 0 
     };
   });
 }
