@@ -47,7 +47,8 @@ export default async function EmployeePortal() {
         </div>
 
         {!employee.deviceId ? (
-          <CopyIdSection />
+          // 👈 التعديل هنا: نمرر الاسم والكود للمكون
+          <CopyIdSection empName={employee.name} empCode={employee.code} />
         ) : (
           <>
             {/* زر طلب إجازة */}
