@@ -3,6 +3,7 @@
 import './globals.css'
 import { Toaster } from 'sonner';
 import { Providers } from "./providers"; // 👈 استيراد الـ Providers
+import ThemeToggle from './_components/ThemeToggle'; // 👈 استيراد المكون
 
 export const metadata = {
   title: "نظام الحضور",
@@ -28,6 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300 min-h-screen">
         <Providers>
+          <div className="fixed bottom-5 left-5 z-50">
+            <ThemeToggle />
+          </div>
           {children}
           <Toaster position="bottom-center" richColors theme="system" />
         </Providers>
