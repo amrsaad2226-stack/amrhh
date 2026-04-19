@@ -1,39 +1,3 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@layer base {
-  /* تنسيقات عامة لحماية شكل الموقع من الانهيار */
-  * {
-    border-color: theme('colors.slate.200');
-  }
-  
-  /* حماية التصميم في الوضع الليلي */
-  .dark * {
-    border-color: theme('colors.slate.800');
-  }
-
-  /* ضبط الخلفية والخطوط بشكل سليم يتفاعل مع الزرار */
-  body {
-    @apply bg-slate-50 text-slate-900 antialiased selection:bg-blue-200 selection:text-blue-900;
-  }
-
-  .dark body {
-    @apply bg-slate-950 text-slate-100 selection:bg-blue-900 selection:text-blue-100;
-  }
-}
-
-/* إخفاء شريط التمرير (Scrollbar) المزعج ليصبح التطبيق كالموبايل */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full;
-}
-.dark ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700;
-}
