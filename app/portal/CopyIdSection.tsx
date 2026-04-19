@@ -1,85 +1,48 @@
-
 "use client";
 import { useState, useEffect } from "react";
-import { Copy, Check, MapPin, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Copy, Check, Clock } from "lucide-react";
 
-export default function CopyIdSection({ empName, empCode }: { empName: string, empCode: string }) {
+export default function CopyIdSection() {
   const [deviceId, setDeviceId] = useState("");
   const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    let id = localStorage.getItem("device_id");
-    if (!id) {
-      id = "dev-" + Math.random().toString(36).substring(2, 12);
-      localStorage.setItem("device_id", id);
-    }
-    setDeviceId(id);
+    // جلب البصمة الحالية من المتصفح
+    setDeviceId(localStorage.getItem("device_id") || "جاري التحميل...");
   }, []);
 
-  const handleExtractAndCopy = () => {
-    setLoading(true);
-    const toastId = toast.loading("جاري قراءة الموقع وبصمة الجهاز...");
-
-    // طلب تصريح الـ GPS من الموظف
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        
-        // تجهيز رسالة احترافية منظمة للمدير
-        const message = `مرحباً، أرجو تفعيل حسابي وإضافة فرع العمل:
-👤 الموظف: ${empName}
-🔢 الكود: ${empCode}
-📱 بصمة الجهاز: ${deviceId}
-
-📍 إحداثيات الموقع الحالي:
-- خط العرض (Lat): ${latitude}
-- خط الطول (Lng): ${longitude}
-- الدقة: ${Math.round(accuracy)} متر
-🗺️ رابط الخريطة: https://www.google.com/maps?q=${latitude},${longitude}`;
-
-        // نسخ الرسالة بالكامل
-        navigator.clipboard.writeText(message);
-        
-        toast.success("✅ تم نسخ البيانات! يمكنك لصقها في الواتساب وإرسالها للمدير.", { id: toastId });
-        setCopied(true);
-        setLoading(false);
-        setTimeout(() => setCopied(false), 5000);
-      },
-      (error) => {
-        toast.error("❌ فشل تحديد الموقع. يرجى تفعيل الـ GPS (الموقع) في هاتفك والمحاولة مرة أخرى.", { id: toastId });
-        setLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000 }
-    );
+  const handleCopy = () => {
+    navigator.clipboard.writeText(`بصمة جهازي لتفعيل الحساب:\n${deviceId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md p-6 rounded-[2rem] border border-white/20 text-center">
-      <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-white">
-        <MapPin size={32} />
+    <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 text-center shadow-sm animate-in zoom-in duration-300">
+      <div className="bg-amber-200/50 text-amber-600 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+        <Clock size={40} />
       </div>
       
-      <h3 className="text-lg font-black text-white mb-2">تحديد موقع الفرع وتفعيل الحساب</h3>
-      <p className="text-xs text-blue-100 mb-6 leading-relaxed">
-        قف في مقر العمل الفعلي (لأخذ الإحداثيات بدقة)، ثم اضغط على الزر أدناه لنسخ بياناتك وإرسالها للمدير.
+      <h3 className="text-xl font-black text-amber-800 mb-2">في انتظار التفعيل ⏳</h3>
+      <p className="text-xs font-bold text-amber-700/70 mb-8 leading-relaxed">
+        لقد قمت بتسجيل الدخول بنجاح، ولكن حسابك لم يتم ربطه بهذا الهاتف حتى الآن من قِبل الإدارة. لن تظهر أزرار الحضور والانصراف إلا بعد التفعيل.
       </p>
 
-      <button 
-        onClick={handleExtractAndCopy}
-        disabled={loading}
-        className="w-full bg-white text-blue-600 p-4 rounded-2xl hover:bg-blue-50 transition-all active:scale-95 shadow-xl font-black flex justify-center items-center gap-2"
-      >
-        {loading ? <Loader2 className="animate-spin" size={20} /> : copied ? <Check size={20} /> : <Copy size={20} />}
-        {loading ? "جاري استخراج البيانات..." : copied ? "تم النسخ! اذهب للواتساب" : "استخراج ونسخ البيانات"}
-      </button>
-
-      {copied && (
-        <p className="mt-4 text-[10px] text-green-300 font-bold bg-green-900/30 p-2 rounded-lg">
-          تم نسخ الرسالة محتوية على (بصمتك + إحداثيات الـ GPS الخاصة بك). قم بعمل Paste في محادثة المدير.
-        </p>
-      )}
+      <div className="text-right mb-2">
+        <span className="text-[10px] font-black text-amber-600">كود جهازك الحالي (في حال طلبه المدير):</span>
+      </div>
+      
+      <div className="bg-white p-2 rounded-2xl flex items-center gap-2 border border-amber-200 shadow-sm">
+        <div className="flex-1 font-mono text-[10px] sm:text-xs text-slate-500 text-center select-all truncate">
+          {deviceId}
+        </div>
+        <button 
+          onClick={handleCopy} 
+          className="bg-amber-100 text-amber-700 p-3 rounded-xl hover:bg-amber-200 transition-colors active:scale-95 flex items-center justify-center"
+        >
+          {copied ? <Check size={20} /> : <Copy size={20} />}
+        </button>
+      </div>
     </div>
   );
 }
