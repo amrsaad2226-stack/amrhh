@@ -20,7 +20,9 @@ export async function addBranch(formData: FormData) {
       data: { name, latitude, longitude }
     });
     
-    revalidatePath("/admin/branches");
+    revalidatePath("/admin/branches"); 
+    revalidatePath("/admin");
+    
     return { success: true };
   } catch (error: any) {
     console.error("Error adding branch:", error);
