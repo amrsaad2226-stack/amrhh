@@ -21,7 +21,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // 👈 أضف suppressHydrationWarning هنا لكي لا يشتكي Next.js من تغيير الـ class
-    <html lang="ar" dir="rtl" class="dark" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
         {/* هذا السطر يمنع الموبايل من عمل Zoom عند الكتابة ويجعلها تبدو كتطبيق */}
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
