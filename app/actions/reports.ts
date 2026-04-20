@@ -1,3 +1,4 @@
+"use server";
 import prisma from "@/lib/db"; // أو المسار الصحيح لقاعدة البيانات عندك
 
 // 1. استدعاء الموظفين للقائمة المنسدلة
@@ -26,17 +27,12 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
     // تحويل الـ empId إلى رقم إذا تم تحديده، لأن قاعدة بياناتك تستخدم أرقاماً
     if (empId) whereClause.employeeId = Number(empId);
 
-// استدعاء البيانات
+    // استدعاء البيانات
     const records = await prisma.attendance.findMany({
       where: whereClause,
+      // 👈👈 التعديل هنا: استدعاء كامل بيانات الموظف لضمان وصول الاسم
       include: {
-        employee: {
-          select: { 
-            name: true,
-            dailyHours: true,   // 👈 متطابق مع الداتا بيز عندك
-            dailySalary: true   // 👈 متطابق مع الداتا بيز عندك (كانت salary)
-          } 
-        }
+        employee: true 
       },
       orderBy: [
         { employeeId: "asc" },
@@ -76,15 +72,15 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
 
       return {
         id: record.id,
-        empName: record.employee.name,
-        defaultHrs: empDailyHours, // 👈 ستظهر ساعاته الحقيقية من الداتا بيز (8 أو 10)
+        empName: record.employee.name, // 👈 الآن سيتم استدعاء الاسم بنجاح
+        defaultHrs: empDailyHours, 
         date: record.date.toISOString().split("T")[0],
         checkIn: record.checkIn ? record.checkIn.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "---",
         checkOut: record.checkOut ? record.checkOut.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "---",
         actualHrs: actualHours.toFixed(1),
         deficit: deficit.toFixed(1),
         overtime: overtime.toFixed(1),
-        balance: Math.round(cumulativeBalance), // الرصيد التراكمي
+        balance: Math.round(cumulativeBalance), 
       };
     });
 
