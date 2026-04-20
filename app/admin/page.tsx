@@ -57,7 +57,7 @@ export default async function AdminDashboard() {
             </div>
           </Link>
 
-          <Link href="/admin/logs" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all group flex items-center gap-4 active:scale-95">
+          <Link href="/admin/reports/detailed" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all group flex items-center gap-4 active:scale-95">
             <div className="bg-purple-50 text-purple-600 p-4 rounded-2xl group-hover:bg-purple-600 group-hover:text-white transition-colors">
               <ListOrdered size={24} />
             </div>
