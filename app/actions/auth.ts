@@ -29,5 +29,5 @@ export async function logoutEmployee() {
   // 👈 التعديل هنا أيضاً
   const cookieStore = await cookies();
   cookieStore.delete("emp_session");
-  redirect("/portal/login");
+  redirect("/login"); // 👈 غيرنا هذه من /portal/login إلى /login
 }
