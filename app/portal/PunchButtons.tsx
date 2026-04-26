@@ -19,25 +19,22 @@ export default function PunchButtons({ employeeCode, isCurrentlyIn }: { employee
     setLoading(true);
     setMessage(null);
 
-    // Get current location
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         const res = action === 'checkin' 
-          ? await checkInAction(employeeCode, deviceId, latitude, longitude)
-          : await checkOutAction(employeeCode, deviceId, latitude, longitude);
+          ? await checkInAction(employeeCode, latitude, longitude, deviceId)
+          : await checkOutAction(employeeCode, latitude, longitude, deviceId);
 
         if (res.error) {
           setMessage({ text: res.error, type: 'error' });
         } else {
           setMessage({ text: res.success || 'تمت العملية بنجاح', type: 'success' });
-          // Refresh the page to show the new state
           router.refresh();
         }
         setLoading(false);
       },
       (error) => {
-        // Handle location error
         let errorMessage = "لا يمكن الوصول لموقعك. يرجى تفعيل خدمات الموقع والمحاولة مجدداً.";
         if(error.code === 1) errorMessage = "تم رفض إذن الوصول للموقع. يرجى السماح بالوصول والمحاولة مجدداً.";
         setMessage({ text: errorMessage, type: 'error' });
