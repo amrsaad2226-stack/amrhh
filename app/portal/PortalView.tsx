@@ -5,15 +5,17 @@ import PunchButtons from "./PunchButtons";
 import CopyIdSection from "./CopyIdSection";
 import { Attendance } from '@prisma/client';
 
+// Corrected props interface to match the parent component's call
 interface PortalViewProps {
   employee: {
     code: string;
     name: string;
-    lastSession: Attendance | null;
   };
+  isCurrentlyIn: boolean;
+  lastSession?: Attendance | null; // <-- Made optional as requested
 }
 
-export default function PortalView({ employee }: PortalViewProps) {
+export default function PortalView({ employee, isCurrentlyIn, lastSession }: PortalViewProps) {
   const [deviceId, setDeviceId] = useState<string>("");
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export default function PortalView({ employee }: PortalViewProps) {
 
       <PunchButtons 
         employeeCode={employee.code} 
-        isCurrentlyIn={!!employee.lastSession && !employee.lastSession.checkOut}
+        isCurrentlyIn={isCurrentlyIn} // Directly use the passed prop
       />
 
       <div className="my-4 border-t border-dashed border-slate-300 dark:border-slate-700"></div>
