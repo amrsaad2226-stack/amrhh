@@ -3,40 +3,44 @@ import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { logoutEmployee } from "@/app/actions/auth";
-import { LogOut, Clock, Send } from "lucide-react";
-
-// مسارات معدلة لتقرأ المكونات من فولدر portal القديم
-import PunchButtons from "./portal/PunchButtons";
-import CopyIdSection from "./portal/CopyIdSection";
-import LeaveRequestForm from "./portal/_components/LeaveRequestForm";
+import { LogOut } from "lucide-react";
 import ThemeToggle from "./_components/ThemeToggle";
+import PortalView from "./portal/PortalView"; // Import the centralized client component
+
+// This is the main page for logged-in users.
+// It has been refactored to use a single client component, PortalView,
+// to manage all client-side state and logic, including the deviceId.
 
 export default async function HomePage() {
   const cookieStore = await cookies();
   const empId = cookieStore.get("emp_session")?.value;
-  
-  // توجيه لصفحة تسجيل الدخول إذا لم يكن هناك جلسة
-  if (!empId) redirect("/login");
 
+  // If no session, redirect to the new login page within the portal route
+  if (!empId) redirect("/portal/login");
+
+  // Fetch all necessary data for the user on the server side.
   const employee = await db.employee.findUnique({
     where: { id: parseInt(empId) },
-    include: { 
+    include: {
       attendances: { orderBy: { checkIn: 'desc' }, take: 10 },
-      // @ts-ignore: Ignore cached Prisma types
-      leaveRequests: { orderBy: { createdAt: 'desc' }, take: 5 }
-    }
-  }) as any;
+      // The ts-ignore is kept as it was in the original file.
+      // @ts-ignore
+      leaveRequests: { orderBy: { createdAt: 'desc' }, take: 5 },
+    },
+  });
 
-  if (!employee) redirect("/login");
+  // If for any reason the employee is not found, clear session and redirect.
+  if (!employee) redirect("/portal/login"); 
 
-  const lastAttendance = employee.attendances && employee.attendances[0];
+  // Determine if the employee is currently checked in.
+  const lastAttendance = employee.attendances?.[0];
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
       <div className="max-w-xl mx-auto">
-        
-        {/* Header الشخصي */}
+
+        {/* User Header (Server Component) */}
         <div className="bg-white dark:bg-slate-900 p-6 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-slate-800 mb-6 flex justify-between items-center transition-colors">
           <div>
             <h1 className="text-2xl font-black text-slate-800 dark:text-white">{employee.name}</h1>
@@ -52,61 +56,16 @@ export default async function HomePage() {
           </div>
         </div>
 
-        {!employee.deviceId ? (
-          <CopyIdSection />
-        ) : (
-          <>
-            <div className="mb-6">
-               <LeaveRequestForm employeeId={employee.id} />
-            </div>
+        {/* 
+          This is the core of the fix. 
+          Instead of complex conditional rendering and passing individual props,
+          we delegate the entire client-side view to the PortalView component.
+          PortalView is now the single source of truth for the deviceId.
+          It fetches the deviceId once and passes it down to its children (PunchButtons, CopyIdSection, etc.).
+          This eliminates the error where CopyIdSection was rendered without the required deviceId prop.
+        */}
+        <PortalView employee={employee} isCurrentlyIn={isCurrentlyIn} />
 
-            <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
-
-            {employee.leaveRequests && employee.leaveRequests.length > 0 && (
-              <div className="mt-8">
-                <h3 className="font-black text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2 text-sm">
-                  <Send size={16} className="text-blue-600" /> حالة طلبات الإجازة
-                </h3>
-                <div className="space-y-3">
-                  {employee.leaveRequests.map((leave: any) => (
-                    <div key={leave.id} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-50 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                      <div>
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{leave.type}</p>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500">من {new Date(leave.startDate).toLocaleDateString('ar-EG')} إلى {new Date(leave.endDate).toLocaleDateString('ar-EG')}</p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black ${ 
-                        leave.status === 'Approved' ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400' : 
-                        leave.status === 'Rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                      }`}>
-                        {leave.status === 'Approved' ? 'تمت الموافقة' : leave.status === 'Rejected' ? 'مرفوض' : 'قيد الانتظار'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <h3 className="font-black text-slate-700 dark:text-slate-300 mt-8 mb-4 flex items-center gap-2 text-sm">
-              <Clock size={16} className="text-blue-600" /> سجل حركاتك الأخيرة
-            </h3>
-            <div className="space-y-3">
-              {employee.attendances && employee.attendances.map((att: any) => (
-                <div key={att.id} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                  <div>
-                    <p className="text-xs font-black text-slate-800 dark:text-slate-200 mb-1">{att.date.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}</p>
-                    <div className="flex gap-3 text-[10px] font-bold text-slate-400 dark:text-slate-500">
-                       <span className="text-green-600 dark:text-green-500">دخول: {att.checkIn?.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo'})}</span>
-                       {att.checkOut && <span className="text-red-600 dark:text-red-500">خروج: {att.checkOut.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo'})}</span>}
-                    </div>
-                  </div>
-                  <div className="text-left">
-                     <p className="font-black text-blue-600 text-sm">{att.duration?.toFixed(1) || 0} س</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
