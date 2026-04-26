@@ -11,7 +11,7 @@ export default async function EmployeePortal() {
   const cookieStore = await cookies();
   const empId = cookieStore.get("emp_session")?.value;
   
-  if (!empId) redirect("/portal/login");
+  if (!empId) redirect("/login");
 
   const employee = await db.employee.findUnique({
     where: { id: parseInt(empId) },
@@ -21,10 +21,28 @@ export default async function EmployeePortal() {
     }
   });
 
-  if (!employee) redirect("/portal/login");
+  if (!employee) redirect("/login");
 
   const lastAttendance = employee.attendances && employee.attendances[0];
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
+
+  // --- NEW LOGIC START ---
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  // Calculate the number of completed attendance days this month
+  const attendedDaysCount = await db.attendance.count({
+    where: {
+      employeeId: employee.id,
+      date: {
+        gte: startOfMonth,
+        lte: endOfMonth,
+      },
+      checkOut: { not: null } // Only count days with a check-out
+    }
+  });
+  // --- NEW LOGIC END ---
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
@@ -47,10 +65,11 @@ export default async function EmployeePortal() {
 
         <PortalView 
           employee={employee} 
-          isCurrentlyIn={isCurrentlyIn} 
-          lastSession={lastAttendance}
+          isCurrentlyIn={isCurrentlyIn}
+          attendedDays={attendedDaysCount} // Pass the new data
         />
 
+        {/* The rest of the attendance list remains the same... */}
         <div className="mt-8 space-y-4">
           <h2 className="text-xl font-black text-slate-800 dark:text-white mr-2">سجلات الحضور</h2>
           
