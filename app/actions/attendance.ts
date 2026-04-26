@@ -13,9 +13,9 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     if (!employee) return { error: "كود الموظف غير صحيح" };
     if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
     
-    // Reverted to the original simple comparison
+    // Diagnostic check
     if (employee.deviceId !== deviceId) {
-      return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
+      return { error: `بصمة الجهاز غير متطابقة. المسجل: [${employee.deviceId}] ، المرسل: [${deviceId}]` };
     }
 
     // 1. Location check
@@ -95,9 +95,9 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
     if (!employee) return { error: "كود الموظف غير صحيح" };
     if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
 
-    // Reverted to the original simple comparison
+    // Diagnostic check
     if (employee.deviceId !== deviceId) {
-      return { error: "عذراً، هذا ليس جهازك المسجل!" };
+      return { error: `بصمة الجهاز غير متطابقة. المسجل: [${employee.deviceId}] ، المرسل: [${deviceId}]` };
     }
     
     // Location check
