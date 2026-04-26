@@ -1,30 +1,25 @@
 
 "use client";
 import { useState, useEffect } from "react";
+import { getDeviceId } from "@/lib/device"; // 👈 1. الاستيراد من المصدر الموحد
 import { loginEmployee } from "@/app/actions/auth";
 import { toast } from "sonner";
 import { UserCircle2, MapPin, Copy, Check, Loader2, ArrowRight } from "lucide-react";
 
 export default function PortalLogin() {
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<"LOGIN" | "NEW_EMP">("LOGIN"); // للتبديل بين الشاشتين
+  const [view, setView] = useState<"LOGIN" | "NEW_EMP">("LOGIN");
   
-  // خاص بالموظف الجديد
   const [empName, setEmpName] = useState("");
   const [deviceId, setDeviceId] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // توليد بصمة الجهاز بمجرد فتح الصفحة
+  // 2. استخدام الدالة الموحدة لتوليد البصمة
   useEffect(() => {
-    let id = localStorage.getItem("device_id");
-    if (!id) {
-      id = "dev-" + Math.random().toString(36).substring(2, 12);
-      localStorage.setItem("device_id", id);
-    }
+    const id = getDeviceId();
     setDeviceId(id);
   }, []);
 
-  // دالة تسجيل الدخول العادية
   async function handleLogin(formData: FormData) {
     setLoading(true);
     const res = await loginEmployee(formData);
@@ -33,11 +28,11 @@ export default function PortalLogin() {
       setLoading(false);
     } else {
       toast.success("تم تسجيل الدخول بنجاح!");
-      window.location.href = "/portal";
+      // 3. توجيه للصفحة الرئيسية وهي تتكفل بالباقي
+      window.location.href = "/";
     }
   }
 
-  // دالة استخراج بيانات الموظف الجديد
   const handleExtractData = () => {
     if (!empName.trim()) return toast.error("يرجى كتابة اسمك أولاً");
     
@@ -47,6 +42,7 @@ export default function PortalLogin() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords;
+        // 4. الآن هذا المتغير يحتوي على البصمة الموحدة
         const message = `مرحباً، أنا موظف جديد في موقع جديد.
 👤 الاسم: ${empName}
 📱 بصمة الجهاز: ${deviceId}
@@ -75,7 +71,6 @@ Lng: ${longitude}
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans" dir="rtl">
       <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-xl border border-slate-100 w-full max-w-sm relative overflow-hidden">
         
-        {/* ================= شاشة الدخول ================= */}
         {view === "LOGIN" && (
           <div className="animate-in fade-in slide-in-from-right duration-300">
             <div className="bg-blue-50 text-blue-600 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
@@ -105,7 +100,6 @@ Lng: ${longitude}
           </div>
         )}
 
-        {/* ================= شاشة الموظف الجديد ================= */}
         {view === "NEW_EMP" && (
           <div className="animate-in fade-in slide-in-from-left duration-300">
             <button onClick={() => setView("LOGIN")} className="text-slate-400 hover:text-slate-700 mb-6 flex items-center gap-1 text-sm font-bold">
