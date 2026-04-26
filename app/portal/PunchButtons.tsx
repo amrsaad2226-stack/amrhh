@@ -1,34 +1,52 @@
-"use client";
+'use client';
 import { useState } from "react";
 import { checkInAction, checkOutAction } from "@/app/actions/attendance";
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-// The component now expects deviceId to be passed as a prop
-export default function PunchButtons({ employeeCode, isCurrentlyIn, deviceId }: { employeeCode: string, isCurrentlyIn: boolean, deviceId: string }) {
+// The component is now updated to receive `deviceId` as a prop.
+// This makes `PortalView` the single source of truth for the device ID.
+export default function PunchButtons({ 
+  employeeCode, 
+  isCurrentlyIn,
+  deviceId
+}: { 
+  employeeCode: string, 
+  isCurrentlyIn: boolean,
+  deviceId: string // The prop is now correctly typed.
+}) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: "error" | "success" | "info" } | null>(null);
   const router = useRouter();
 
-  // The useEffect that called getDeviceId() has been removed.
-
   const handleAction = async (action: "checkin" | "checkout") => {
     setLoading(true);
     setMessage(null);
-    
-    if (!deviceId) {
-        setMessage({ text: "لم يتم العثور على بصمة الجهاز. حاول تحديث الصفحة.", type: 'error' });
+
+    // We now use the `deviceId` passed from the parent component (`PortalView`).
+    // This ensures consistency and avoids fetching the ID from localStorage again.
+    const currentDeviceId = deviceId;
+
+    if (!currentDeviceId) {
+        setMessage({ text: "لم يتم تحديد بصمة الجهاز. حاول تحديث الصفحة.", type: "error" });
         setLoading(false);
         return;
+    }
+
+    if (!navigator.geolocation) {
+      setMessage({ text: "متصفحك لا يدعم تحديد الموقع", type: "error" });
+      setLoading(false);
+      return;
     }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        // It now uses the deviceId passed in from its parent
+        
+        // The `currentDeviceId` (from props) is sent to the server action.
         const res = action === 'checkin' 
-          ? await checkInAction(employeeCode, latitude, longitude, deviceId)
-          : await checkOutAction(employeeCode, latitude, longitude, deviceId);
+          ? await checkInAction(employeeCode, latitude, longitude, currentDeviceId)
+          : await checkOutAction(employeeCode, latitude, longitude, currentDeviceId);
 
         if (res.error) {
           setMessage({ text: res.error, type: 'error' });
@@ -39,46 +57,45 @@ export default function PunchButtons({ employeeCode, isCurrentlyIn, deviceId }: 
         setLoading(false);
       },
       (error) => {
-        let errorMessage = "لا يمكن الوصول لموقعك. يرجى تفعيل خدمات الموقع والمحاولة مجدداً.";
-        if(error.code === 1) errorMessage = "تم رفض إذن الوصول للموقع. يرجى السماح بالوصول والمحاولة مجدداً.";
+        let errorMessage = "فشل تحديد الموقع. تأكد من تفعيل الـ GPS.";
+        if(error.code === 1) errorMessage = "يرجى إعطاء إذن الوصول للموقع للمتصفح.";
         setMessage({ text: errorMessage, type: 'error' });
         setLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   };
 
   return (
-    <>
-      {message && (
-        <div className={`p-4 rounded-2xl mb-4 text-sm font-bold flex items-center gap-3 transition-all ${
-          message.type === 'error' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' :
-          message.type === 'success' ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' :
-          'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'
-        }`}>
-          {message.type === 'error' && <AlertCircle size={20} />}
-          {message.type === 'success' && <CheckCircle2 size={20} />}
-          <span>{message.text}</span>
+    <div>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <button 
+            disabled={loading || isCurrentlyIn}
+            onClick={() => handleAction("checkin")}
+            className="bg-green-600 text-white font-black py-6 rounded-3xl disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 transition-all duration-300">
+              حضور
+          </button>
+          <button 
+            disabled={loading || !isCurrentlyIn}
+            onClick={() => handleAction("checkout")}
+            className="bg-red-500 text-white font-black py-6 rounded-3xl disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 transition-all duration-300">
+              انصراف
+          </button>
         </div>
-      )}
-      <div className="grid grid-cols-2 gap-4">
-        <button
-          onClick={() => handleAction("checkin")}
-          disabled={loading || isCurrentlyIn}
-          className="bg-green-500 text-white font-black p-6 rounded-3xl disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-        >
-          {loading && <Loader2 className="animate-spin" />}
-          تسجيل حضور
-        </button>
-        <button
-          onClick={() => handleAction("checkout")}
-          disabled={loading || !isCurrentlyIn}
-          className="bg-red-500 text-white font-black p-6 rounded-3xl disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-        >
-          {loading && <Loader2 className="animate-spin" />}
-          تسجيل انصراف
-        </button>
-      </div>
-    </>
+
+        {loading && (
+            <div className="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400 p-4 rounded-lg bg-slate-100 dark:bg-slate-800/50">
+                <Loader2 className="animate-spin" size={20}/>
+                <span className="text-sm font-bold">جاري تحديد موقعك وتسجيل الحركة...</span>
+            </div>
+        )}
+
+        {message && (
+            <div className={`flex items-center justify-center gap-2 p-4 rounded-lg ${message.type === 'error' ? 'bg-red-100 dark:bg-red-500/10 text-red-700' : 'bg-green-100 dark:bg-green-500/10 text-green-700'}`}>
+                {message.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+                <span className="text-sm font-bold">{message.text}</span>
+            </div>
+        )}
+    </div>
   );
 }
