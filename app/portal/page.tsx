@@ -47,7 +47,7 @@ export default async function EmployeePortal() {
           </div>
         </div>
 
-        {/* Delegate all client-side logic to PortalView */}
+        {/* Delegate all client-side logic to PortalView. This is the fix. */}
         <PortalView employee={employee} isCurrentlyIn={isCurrentlyIn} />
 
       </div>
