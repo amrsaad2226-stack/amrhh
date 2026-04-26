@@ -1,20 +1,27 @@
-
 "use client";
 import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import LeaveRequestForm from "./_components/LeaveRequestForm";
-import { Send, Clock } from "lucide-react";
-import SalaryDashboard from "./_components/SalaryDashboard"; // Import the new component
+import SalaryDashboard from "./_components/SalaryDashboard";
 
-// Define a clear interface for the props
+// Updated interface for the new props
 interface PortalViewProps {
   employee: any;
   isCurrentlyIn: boolean;
-  attendedDays: number; // Receive the attended days count
+  totalEarnings: number;
+  totalHours: number;
+  monthlyTarget: number;
 }
 
-export default function PortalView({ employee, isCurrentlyIn, attendedDays }: PortalViewProps) {
+export default function PortalView({ 
+  employee, 
+  isCurrentlyIn, 
+  totalEarnings, 
+  totalHours, 
+  monthlyTarget 
+}: PortalViewProps) {
+  
   const [deviceId, setDeviceId] = useState<string>("");
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -65,10 +72,11 @@ export default function PortalView({ employee, isCurrentlyIn, attendedDays }: Po
   // --- Main Authorized View ---
   return (
     <div className="space-y-6">
-      {/* The new gamified salary dashboard is the star of the show */}
+      {/* Pass the new, accurate data to the dashboard */}
       <SalaryDashboard 
-        dailySalary={employee.dailySalary || 0} 
-        attendedDays={attendedDays} 
+        totalEarnings={totalEarnings} 
+        totalHours={totalHours}
+        monthlyTarget={monthlyTarget}
       />
 
       {/* Primary Actions: Punch In/Out */}

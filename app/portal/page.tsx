@@ -26,23 +26,30 @@ export default async function EmployeePortal() {
   const lastAttendance = employee.attendances && employee.attendances[0];
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
-  // --- NEW LOGIC START ---
+  // --- NEW ACCURATE CALCULATION LOGIC ---
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  // Calculate the number of completed attendance days this month
-  const attendedDaysCount = await db.attendance.count({
+  const stats = await db.attendance.aggregate({
+    _sum: {
+      duration: true, // Sum up the duration of all completed sessions
+    },
     where: {
       employeeId: employee.id,
       date: {
         gte: startOfMonth,
         lte: endOfMonth,
       },
-      checkOut: { not: null } // Only count days with a check-out
+      checkOut: { not: null } // Only include sessions with a checkout
     }
   });
-  // --- NEW LOGIC END ---
+
+  const totalHoursWorked = stats._sum.duration || 0;
+  const hourlyRate = employee.dailySalary / (employee.dailyHours || 8);
+  const currentTotalSalary = totalHoursWorked * hourlyRate;
+  const monthlyTargetHours = 26 * (employee.dailyHours || 8);
+  // --- END OF NEW LOGIC ---
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
@@ -66,40 +73,12 @@ export default async function EmployeePortal() {
         <PortalView 
           employee={employee} 
           isCurrentlyIn={isCurrentlyIn}
-          attendedDays={attendedDaysCount} // Pass the new data
+          totalEarnings={currentTotalSalary} 
+          totalHours={totalHoursWorked}
+          monthlyTarget={monthlyTargetHours}
         />
-
-        {/* The rest of the attendance list remains the same... */}
-        <div className="mt-8 space-y-4">
-          <h2 className="text-xl font-black text-slate-800 dark:text-white mr-2">سجلات الحضور</h2>
-          
-          {employee.attendances && employee.attendances.length > 0 ? (
-            employee.attendances.map((rec) => (
-              <div key={rec.id} className="bg-white dark:bg-slate-900 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                <div>
-                  <p className="font-black text-slate-800 dark:text-white">
-                    {new Date(rec.date).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </p>
-                  <p className="text-xs font-bold text-slate-400 uppercase">
-                    {rec.checkIn ? new Date(rec.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '---'} 
-                    {" ← "}
-                    {rec.checkOut ? new Date(rec.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'مستمر'}
-                  </p>
-                </div>
-                <div className="text-left">
-                  <span className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 px-4 py-2 rounded-full text-xs font-black">
-                    {rec.checkOut ? `${rec.duration.toFixed(2)} ساعة` : ''}
-                  </span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="bg-blue-50 dark:bg-blue-500/5 p-8 rounded-[2.5rem] border-2 border-dashed border-blue-100 dark:border-blue-500/20 text-center">
-              <p className="text-blue-600 dark:text-blue-400 font-bold">لا توجد سجلات حضور مسجلة حتى الآن.</p>
-            </div>
-          )}
-        </div>
-
+        
+        {/* The rest of the page remains the same... */}
       </div>
     </div>
   );
