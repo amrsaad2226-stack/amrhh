@@ -12,7 +12,11 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
 
     if (!employee) return { error: "كود الموظف غير صحيح" };
     if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
-    if (employee.deviceId !== deviceId) return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
+    
+    // Reverted to the original simple comparison
+    if (employee.deviceId !== deviceId) {
+      return { error: "عذراً! لا يمكنك البصمة إلا من جهازك الشخصي المسجل" };
+    }
 
     // 1. Location check
     let isNearAnyAllowedBranch = false;
@@ -89,7 +93,12 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
     });
 
     if (!employee) return { error: "كود الموظف غير صحيح" };
-    if (employee.deviceId !== deviceId) return { error: "عذراً، هذا ليس جهازك المسجل!" };
+    if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
+
+    // Reverted to the original simple comparison
+    if (employee.deviceId !== deviceId) {
+      return { error: "عذراً، هذا ليس جهازك المسجل!" };
+    }
     
     // Location check
     let isNearAnyAllowedBranch = false;
