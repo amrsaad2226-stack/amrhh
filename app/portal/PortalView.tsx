@@ -6,18 +6,27 @@ import PunchButtons from "./PunchButtons";
 import LeaveRequestForm from "./_components/LeaveRequestForm";
 import { Send, Clock } from "lucide-react";
 
-// This component is the single source of truth for the client-side view.
-// It receives server-fetched employee data and determines what to display.
 export default function PortalView({ employee, isCurrentlyIn }: any) {
+  // 1. إضافة حالة للتأكد من اكتمال التحميل
   const [deviceId, setDeviceId] = useState<string>("");
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    // We fetch the unified device ID from our centralized function.
     const id = getDeviceId();
     setDeviceId(id);
+    setIsInitializing(false); // 2. تم التحميل بنجاح
   }, []);
 
-  // Scenario 1: The employee is logged in, but their device is not yet activated by an admin.
+  // 3. منع ظهور أي شيء (أو عرض لودر بسيط) حتى تستقر البصمة
+  if (isInitializing) {
+    return (
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+  
+    // Scenario 1: The employee is logged in, but their device is not yet activated by an admin.
   // We show a clear message with the device ID they need to send.
   if (!employee.deviceId) {
     return (
@@ -32,9 +41,12 @@ export default function PortalView({ employee, isCurrentlyIn }: any) {
     );
   }
 
-  // Scenario 2: The employee's device ID from the browser does not match the one in the database.
-  // This is a security measure to prevent logging in from unauthorized devices.
-  if (employee.deviceId !== deviceId) {
+  // 4. الآن فقط نقوم بالمقارنة
+  const isDeviceAuthorized = 
+    employee.deviceId && 
+    employee.deviceId.trim().toLowerCase() === deviceId.trim().toLowerCase();
+
+  if (!isDeviceAuthorized) {
     return (
       <div className="p-6 bg-red-50 dark:bg-red-500/10 rounded-[2rem] text-center border-2 border-dashed border-red-200 dark:border-red-500/20">
         <h2 className="text-xl font-bold text-red-700 dark:text-red-300 mb-2">جهاز غير مصرح به</h2>
@@ -45,7 +57,7 @@ export default function PortalView({ employee, isCurrentlyIn }: any) {
     );
   }
 
-  // Scenario 3: The device is authorized. Show the main employee portal functionality.
+  // إذا كان كل شيء سليم، اعرض الأزرار
   return (
     <div className="space-y-6">
       {/* Leave Request Form */}
