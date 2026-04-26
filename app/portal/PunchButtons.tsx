@@ -1,27 +1,31 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { checkInAction, checkOutAction } from "@/app/actions/attendance";
-import { getDeviceId } from "@/lib/device";
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-export default function PunchButtons({ employeeCode, isCurrentlyIn }: { employeeCode: string, isCurrentlyIn: boolean }) {
+// The component now expects deviceId to be passed as a prop
+export default function PunchButtons({ employeeCode, isCurrentlyIn, deviceId }: { employeeCode: string, isCurrentlyIn: boolean, deviceId: string }) {
   const [loading, setLoading] = useState(false);
-  const [deviceId, setDeviceId] = useState("");
   const [message, setMessage] = useState<{ text: string, type: "error" | "success" | "info" } | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    setDeviceId(getDeviceId());
-  }, []);
+  // The useEffect that called getDeviceId() has been removed.
 
   const handleAction = async (action: "checkin" | "checkout") => {
     setLoading(true);
     setMessage(null);
+    
+    if (!deviceId) {
+        setMessage({ text: "لم يتم العثور على بصمة الجهاز. حاول تحديث الصفحة.", type: 'error' });
+        setLoading(false);
+        return;
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        // It now uses the deviceId passed in from its parent
         const res = action === 'checkin' 
           ? await checkInAction(employeeCode, latitude, longitude, deviceId)
           : await checkOutAction(employeeCode, latitude, longitude, deviceId);
