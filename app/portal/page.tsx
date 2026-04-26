@@ -16,7 +16,10 @@ export default async function EmployeePortal() {
   const employee = await db.employee.findUnique({
     where: { id: parseInt(empId) },
     include: { 
-      attendances: { orderBy: { checkIn: 'desc' }, take: 10 },
+      attendances: { 
+        orderBy: { checkIn: 'desc' }, 
+        take: 7 // Fetch the last 7 records as per the new design
+      },
       leaveRequests: { orderBy: { createdAt: 'desc' }, take: 5 }
     }
   });
@@ -26,14 +29,14 @@ export default async function EmployeePortal() {
   const lastAttendance = employee.attendances && employee.attendances[0];
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
-  // --- NEW ACCURATE CALCULATION LOGIC ---
+  // --- ACCURATE CALCULATION LOGIC ---
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   const stats = await db.attendance.aggregate({
     _sum: {
-      duration: true, // Sum up the duration of all completed sessions
+      duration: true,
     },
     where: {
       employeeId: employee.id,
@@ -41,7 +44,7 @@ export default async function EmployeePortal() {
         gte: startOfMonth,
         lte: endOfMonth,
       },
-      checkOut: { not: null } // Only include sessions with a checkout
+      checkOut: { not: null } 
     }
   });
 
@@ -49,7 +52,6 @@ export default async function EmployeePortal() {
   const hourlyRate = employee.dailySalary / (employee.dailyHours || 8);
   const currentTotalSalary = totalHoursWorked * hourlyRate;
   const monthlyTargetHours = 26 * (employee.dailyHours || 8);
-  // --- END OF NEW LOGIC ---
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
@@ -78,7 +80,6 @@ export default async function EmployeePortal() {
           monthlyTarget={monthlyTargetHours}
         />
         
-        {/* The rest of the page remains the same... */}
       </div>
     </div>
   );
