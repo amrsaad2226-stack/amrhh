@@ -1,86 +1,42 @@
 "use client";
-
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getDeviceId } from '@/lib/device';
 import PunchButtons from "./PunchButtons";
 import CopyIdSection from "./CopyIdSection";
-import LeaveRequestForm from "./_components/LeaveRequestForm";
-import { Send, Clock } from 'lucide-react';
+import { Attendance } from '@prisma/client';
 
-// This is the new "Manager" component. It controls the deviceId.
-export default function PortalView({ employee, isCurrentlyIn }: { employee: any, isCurrentlyIn: boolean }) {
-  const [deviceId, setDeviceId] = useState('');
+interface PortalViewProps {
+  employee: {
+    code: string;
+    name: string;
+    lastSession: Attendance | null;
+  };
+}
 
-  // 1. Get the device ID once when the component loads.
+export default function PortalView({ employee }: PortalViewProps) {
+  const [deviceId, setDeviceId] = useState<string>("");
+
   useEffect(() => {
-    setDeviceId(getDeviceId());
+    // Fetch the device ID on the client-side
+    const id = getDeviceId();
+    setDeviceId(id);
   }, []);
 
   return (
-    <>
-      {!employee.deviceId ? (
-        // 2. Pass the single source of truth ID to the CopyIdSection
-        <CopyIdSection deviceId={deviceId} />
-      ) : (
-        <>
-          <div className="mb-6">
-            <LeaveRequestForm employeeId={employee.id} />
-          </div>
-          
-          {/* 3. Pass the single source of truth ID to the PunchButtons */}
-          <PunchButtons 
-            employeeCode={employee.code} 
-            isCurrentlyIn={isCurrentlyIn}
-            deviceId={deviceId} 
-          />
+    <div className="w-full max-w-sm">
+      <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-3xl mb-4 text-center">
+        <h1 className="font-black text-2xl text-slate-800 dark:text-white">مرحباً, {employee.name}</h1>
+        <p className="font-bold text-slate-500 dark:text-slate-400 mt-1">رمز الموظف: {employee.code}</p>
+      </div>
 
-          {/* Leave Requests History */}
-          {employee.leaveRequests && employee.leaveRequests.length > 0 && (
-            <div className="mt-8">
-              <h3 className="font-black text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2 text-sm">
-                <Send size={16} className="text-blue-600" /> حالة طلبات الإجازة
-              </h3>
-              <div className="space-y-3">
-                {employee.leaveRequests.map((leave: any) => (
-                  <div key={leave.id} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-50 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                    <div>
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{leave.type}</p>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500">من {new Date(leave.startDate).toLocaleDateString('ar-EG')} إلى {new Date(leave.endDate).toLocaleDateString('ar-EG')}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black ${
-                      leave.status === 'Approved' ? 'bg-green-100 dark:bg-green-500/10 text-green-700 dark:text-green-400' : 
-                      leave.status === 'Rejected' ? 'bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                    }`}>
-                      {leave.status === 'Approved' ? 'تمت الموافقة' : leave.status === 'Rejected' ? 'مرفوض' : 'قيد الانتظار'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      <PunchButtons 
+        employeeCode={employee.code} 
+        isCurrentlyIn={!!employee.lastSession && !employee.lastSession.checkOut}
+      />
 
-          {/* Attendance History */}
-          <h3 className="font-black text-slate-700 dark:text-slate-300 mt-8 mb-4 flex items-center gap-2 text-sm">
-            <Clock size={16} className="text-blue-600" /> سجل حركاتك الأخيرة
-          </h3>
-          <div className="space-y-3">
-            {employee.attendances && employee.attendances.map((att: any) => (
-              <div key={att.id} className="bg-white dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                <div>
-                  <p className="text-xs font-black text-slate-800 dark:text-slate-200 mb-1">{new Date(att.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}</p>
-                  <div className="flex gap-3 text-[10px] font-bold text-slate-400 dark:text-slate-500">
-                     <span className="text-green-600 dark:text-green-500">دخول: {att.checkIn?.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo'})}</span>
-                     {att.checkOut && <span className="text-red-600 dark:text-red-500">خروج: {att.checkOut.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo'})}</span>}
-                  </div>
-                </div>
-                <div className="text-left">
-                   <p className="font-black text-blue-600 text-sm">{att.duration?.toFixed(1) || 0} س</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </>
+      <div className="my-4 border-t border-dashed border-slate-300 dark:border-slate-700"></div>
+      
+      <CopyIdSection deviceId={deviceId} />
+    </div>
   );
 }

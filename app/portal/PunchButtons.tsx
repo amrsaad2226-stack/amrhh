@@ -1,20 +1,12 @@
-'use client';
+"use client";
 import { useState } from "react";
 import { checkInAction, checkOutAction } from "@/app/actions/attendance";
+import { getDeviceId } from "@/lib/device"; // Import getDeviceId
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-// The component is now updated to receive `deviceId` as a prop.
-// This makes `PortalView` the single source of truth for the device ID.
-export default function PunchButtons({ 
-  employeeCode, 
-  isCurrentlyIn,
-  deviceId
-}: { 
-  employeeCode: string, 
-  isCurrentlyIn: boolean,
-  deviceId: string // The prop is now correctly typed.
-}) {
+// Remove deviceId from props
+export default function PunchButtons({ employeeCode, isCurrentlyIn }: { employeeCode: string, isCurrentlyIn: boolean }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: "error" | "success" | "info" } | null>(null);
   const router = useRouter();
@@ -23,9 +15,8 @@ export default function PunchButtons({
     setLoading(true);
     setMessage(null);
 
-    // We now use the `deviceId` passed from the parent component (`PortalView`).
-    // This ensures consistency and avoids fetching the ID from localStorage again.
-    const currentDeviceId = deviceId;
+    // Fetch the device ID directly from localStorage at the moment of the click.
+    const currentDeviceId = getDeviceId();
 
     if (!currentDeviceId) {
         setMessage({ text: "لم يتم تحديد بصمة الجهاز. حاول تحديث الصفحة.", type: "error" });
@@ -43,7 +34,7 @@ export default function PunchButtons({
       async (position) => {
         const { latitude, longitude } = position.coords;
         
-        // The `currentDeviceId` (from props) is sent to the server action.
+        // Send the freshly fetched deviceId to the server action.
         const res = action === 'checkin' 
           ? await checkInAction(employeeCode, latitude, longitude, currentDeviceId)
           : await checkOutAction(employeeCode, latitude, longitude, currentDeviceId);
