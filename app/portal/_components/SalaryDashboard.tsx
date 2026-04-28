@@ -26,7 +26,7 @@ export default function SalaryDashboard({
           <p className="text-sm text-blue-200 font-medium mb-1">مستحقاتك الحالية</p>
           <p className="text-4xl font-black flex items-center">
             {totalEarnings.toFixed(0)}
-            <span className="text-lg font-bold ml-1 mr-2">ريال</span>
+            <span className="text-lg font-bold ml-1 mr-2">جنيه</span>
           </p>
         </div>
         <div className="p-3 bg-white/20 rounded-2xl">
