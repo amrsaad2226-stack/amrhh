@@ -6,6 +6,7 @@ import { logoutEmployee } from "@/app/actions/auth";
 import { LogOut } from "lucide-react";
 import ThemeToggle from "../_components/ThemeToggle";
 import PortalView from "./PortalView";
+import { SalaryType } from "@prisma/client";
 
 export default async function EmployeePortal() {
   const cookieStore = await cookies();
@@ -18,7 +19,7 @@ export default async function EmployeePortal() {
     include: { 
       attendances: { 
         orderBy: { checkIn: 'desc' }, 
-        take: 7 // Fetch the last 7 records as per the new design
+        take: 7
       },
       leaveRequests: { orderBy: { createdAt: 'desc' }, take: 5 }
     }
@@ -29,10 +30,49 @@ export default async function EmployeePortal() {
   const lastAttendance = employee.attendances && employee.attendances[0];
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
-  // --- ACCURATE CALCULATION LOGIC ---
+  // --- DYNAMIC SALARY CALCULATION LOGIC ---
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  let startDate: Date;
+  let endDate: Date;
+  let targetHours: number;
+  let periodLabel: string;
+
+  // Helper function to get the start of the week (assuming Saturday is the first day)
+  const getStartOfWeek = (d: Date) => {
+    const date = new Date(d);
+    const day = date.getDay(); // Sunday: 0, ..., Saturday: 6
+    const diff = (day + 1) % 7; // Difference to get back to Saturday
+    date.setDate(date.getDate() - diff);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  };
+
+  switch (employee.salaryType) {
+    case SalaryType.DAILY:
+      startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
+      targetHours = employee.dailyHours || 8;
+      periodLabel = "اليوم";
+      break;
+    case SalaryType.WEEKLY:
+      startDate = getStartOfWeek(now);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+      targetHours = (employee.dailyHours || 8) * (employee.offDay === 'NONE' ? 7 : 6);
+      periodLabel = "الأسبوع";
+      break;
+    case SalaryType.MONTHLY:
+    default:
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      endDate.setHours(23, 59, 59, 999);
+      targetHours = (employee.dailyHours || 8) * 26; // Assuming 26 working days
+      periodLabel = "الشهر";
+      break;
+  }
 
   const stats = await db.attendance.aggregate({
     _sum: {
@@ -41,17 +81,16 @@ export default async function EmployeePortal() {
     where: {
       employeeId: employee.id,
       date: {
-        gte: startOfMonth,
-        lte: endOfMonth,
+        gte: startDate,
+        lte: endDate,
       },
       checkOut: { not: null } 
     }
   });
 
   const totalHoursWorked = stats._sum.duration || 0;
-  const hourlyRate = employee.dailySalary / (employee.dailyHours || 8);
+  const hourlyRate = employee.dailySalary > 0 && employee.dailyHours > 0 ? employee.dailySalary / employee.dailyHours : 0;
   const currentTotalSalary = totalHoursWorked * hourlyRate;
-  const monthlyTargetHours = 26 * (employee.dailyHours || 8);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
@@ -77,7 +116,8 @@ export default async function EmployeePortal() {
           isCurrentlyIn={isCurrentlyIn}
           totalEarnings={currentTotalSalary} 
           totalHours={totalHoursWorked}
-          monthlyTarget={monthlyTargetHours}
+          targetHours={targetHours}
+          periodLabel={periodLabel}
         />
         
       </div>

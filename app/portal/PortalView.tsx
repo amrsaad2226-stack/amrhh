@@ -10,7 +10,8 @@ interface PortalViewProps {
   isCurrentlyIn: boolean;
   totalEarnings: number;
   totalHours: number;
-  monthlyTarget: number;
+  targetHours: number; // Changed from monthlyTarget
+  periodLabel: string; // Added for dynamic period
 }
 
 export default function PortalView({ 
@@ -18,7 +19,8 @@ export default function PortalView({
   isCurrentlyIn, 
   totalEarnings, 
   totalHours, 
-  monthlyTarget 
+  targetHours, // Changed
+  periodLabel // Added
 }: PortalViewProps) {
   
   const [deviceId, setDeviceId] = useState<string>("");
@@ -38,7 +40,6 @@ export default function PortalView({
     );
   }
 
-  // التحقق من البصمة
   const isDeviceAuthorized = 
     employee.deviceId && 
     deviceId && 
@@ -59,17 +60,15 @@ export default function PortalView({
   return (
     <div className="space-y-8 pb-10">
       
-      {/* 1. لوحة الراتب والمؤشرات (اللعبة) */}
       <SalaryDashboard 
         totalEarnings={totalEarnings} 
         totalHours={totalHours}
-        monthlyTarget={monthlyTarget}
+        targetHours={targetHours} // Changed
+        periodLabel={periodLabel} // Added
       />
 
-      {/* 2. أزرار الأكشن (حضور / انصراف) */}
       <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
 
-      {/* 3. سجلات الحضور (تمت إعادتها بتصميم التايم لاين) */}
       <div className="pt-4">
         <div className="flex items-center justify-between mb-6 px-2">
           <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
@@ -85,11 +84,9 @@ export default function PortalView({
           <div className="relative space-y-6 before:absolute before:inset-0 before:mr-5 before:-ml-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-500 before:to-transparent before:opacity-20">
             {employee.attendances.map((record: any, index: number) => (
               <div key={record.id} className="relative flex gap-4 group">
-                {/* النقطة الزمنية */}
                 <div className="absolute right-0 translate-x-1/2 mt-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow-sm z-10 dark:border-slate-900"></div>
 
                 <div className="mr-8 flex-1 bg-white dark:bg-slate-900 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-all hover:-translate-y-1">
-                  {/* الصف الأول: التاريخ والحالة */}
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h4 className="font-bold text-slate-800 dark:text-slate-200">
@@ -108,7 +105,6 @@ export default function PortalView({
                     </div>
                   </div>
 
-                  {/* الصف الثاني: التوقيتات */}
                   <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
                     <div className="flex items-center gap-1.5">
                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
@@ -121,7 +117,6 @@ export default function PortalView({
                     </div>
                   </div>
                   
-                  {/* الصف الثالث: المدة المحسوبة */}
                   {record.duration > 0 && (
                     <div className="mt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
                        <span className="text-xs font-bold text-slate-400">ساعات العمل الفعلية</span>
