@@ -13,12 +13,10 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
     if (!employee) return { error: "كود الموظف غير صحيح" };
     if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
     
-    // The definitive fix: Trim both device IDs before comparing.
     if (employee.deviceId?.trim() !== deviceId?.trim()) {
       return { error: `عذراً، البصمة غير متطابقة. سجل دخول مجدداً.` };
     }
 
-    // 1. Location check
     let isNearAnyAllowedBranch = false;
     let distanceMsg = "";
     if (employee.isAnyBranch) {
@@ -45,7 +43,6 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       return { error: `أنت خارج النطاق الجغرافي للعمل ${distanceMsg}` };
     }
 
-    // 2. Check for an active (non-checked-out) session
     const activeSession = await db.attendance.findFirst({
       where: { 
         employeeId: employee.id, 
@@ -57,7 +54,6 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       return { error: "أنت مسجل حضور بالفعل! يجب تسجيل الانصراف أولاً." };
     }
 
-    // 3. If no active session, create a new one
     const now = new Date();
     const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
     today.setHours(0, 0, 0, 0);
@@ -95,12 +91,10 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
     if (!employee) return { error: "كود الموظف غير صحيح" };
     if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
 
-    // The definitive fix: Trim both device IDs before comparing.
     if (employee.deviceId?.trim() !== deviceId?.trim()) {
       return { error: `عذراً، البصمة غير متطابقة. سجل دخول مجدداً.` };
     }
     
-    // Location check
     let isNearAnyAllowedBranch = false;
     if (employee.isAnyBranch) {
       const allBranches = await db.branch.findMany();
@@ -116,7 +110,6 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
     }
     if (!isNearAnyAllowedBranch) return { error: "أنت خارج نطاق الفرع! لا يمكنك تسجيل الانصراف من هنا." };
 
-    // Find the last active session for the employee
     const lastSession = await db.attendance.findFirst({
       where: { 
         employeeId: employee.id, 
@@ -131,6 +124,16 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
     const checkInTime = new Date(lastSession.checkIn!);
     const diffInMs = now.getTime() - checkInTime.getTime();
     const durationHours = diffInMs / (1000 * 60 * 60);
+
+    // New Logic: Validate session duration
+    const dailyHours = employee.dailyHours || 8; // Default to 8 hours if not set
+    const maxDuration = dailyHours * 2; // Maximum duration is twice the daily hours
+
+    if (durationHours > maxDuration) {
+      return { 
+        error: `مدة العمل (${durationHours.toFixed(1)} ساعة) تجاوزت الحد الأقصى (${maxDuration} ساعة). غالباً نسيت تسجيل الانصراف. يرجى مراجعة المدير لتصحيح السجل.` 
+      };
+    }
 
     await db.attendance.update({
       where: { id: lastSession.id },
