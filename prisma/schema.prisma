@@ -9,17 +9,15 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// 1. جدول الفروع
 model Branch {
   id         Int        @id @default(autoincrement())
-  name       String     @unique // اسم الفرع
+  name       String     @unique
   latitude   Float
   longitude  Float
   address    String?
-  employees  Employee[] // علاقة مع الموظفين
+  employees  Employee[]
 }
 
-// 2. تحديث جدول الموظفين
 model Employee {
   id               Int      @id @default(autoincrement())
   code             String   @unique
@@ -28,30 +26,29 @@ model Employee {
   deviceId         String?  @unique
   role             Role     @default(EMPLOYEE)
   
-  // نظام الفروع الجديد
-  branchId         Int?     // الفرع المحدد (اختياري لو "مفتوح")
+  branchId         Int?
   branch           Branch?  @relation(fields: [branchId], references: [id])
-  isAnyBranch      Boolean  @default(false) // يحق له الحضور في أي فرع
+  isAnyBranch      Boolean  @default(false)
 
-  // الحسابات المالية والإضافي
   dailyHours       Int      @default(10)
   dailySalary      Float
-  overtimeRate     Float    @default(1.0)  // معامل حساب الإضافي (الافتراضي 1)
+  overtimeRate     Float    @default(1.0)
   department       String
   allowDist        Int      @default(50)
 
-  // نظام الإجازات والمواعيد
-  offDay           String   @default("NONE") // السبت، الأحد... أو NONE
-  offDayHours      Int      @default(0)      // عدد الساعات الإلزامية في يوم الإجازة
+  // New field for Salary Type
+  salaryType       SalaryType @default(MONTHLY)
+
+  offDay           String   @default("NONE")
+  offDayHours      Int      @default(0)
   timeIn           String   @default("09:00")
   timeOut          String   @default("17:00")
   
   createdAt        DateTime @default(now())
   attendances      Attendance[]
-  leaveRequests    LeaveRequest[] // 👈 تم التصحيح هنا
+  leaveRequests    LeaveRequest[]
 }
 
-// 3. جدول سجلات الحضور والانصراف اليومية
 model Attendance {
   id            Int      @id @default(autoincrement())
   date          DateTime @default(now())
@@ -79,15 +76,21 @@ enum Role {
   EMPLOYEE
 }
 
-// 4. نموذج طلبات الإجازة
+// Enum for Salary Type
+enum SalaryType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 model LeaveRequest {
   id           Int      @id @default(autoincrement())
   employeeId   Int
   employee     Employee @relation(fields: [employeeId], references: [id])
   startDate    DateTime
   endDate      DateTime
-  type         String   // "Vacation", "Sick", "Emergency"
+  type         String
   reason       String?
-  status       String   @default("Pending") // "Pending", "Approved", "Rejected"
+  status       String   @default("Pending")
   createdAt    DateTime @default(now())
 }

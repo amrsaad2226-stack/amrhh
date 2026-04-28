@@ -8,28 +8,24 @@ export default function AddEmployeeForm({ branches }: { branches: any[] }) {
   const [loading, setLoading] = useState(false);
   const [branchType, setBranchType] = useState("SPECIFIC");
   
-  // 👈 إضافة متغيرات لمراقبة الأوقات وحساب الساعات
   const [timeIn, setTimeIn] = useState("09:00");
   const [timeOut, setTimeOut] = useState("17:00");
   const [dailyHours, setDailyHours] = useState(8);
 
-  // 👈 دالة لحساب الساعات تلقائياً (وتدعم الشيفتات الليلية)
   useEffect(() => {
     const [inH, inM] = timeIn.split(':').map(Number);
     const [outH, outM] = timeOut.split(':').map(Number);
     
     let totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-    // إذا كان الانصراف في اليوم التالي (شيفت مسائي)
     if (totalMinutes < 0) totalMinutes += 24 * 60; 
     
-    // تقريب الساعات
     setDailyHours(Math.round(totalMinutes / 60));
   }, [timeIn, timeOut]);
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
     formData.append("branchType", branchType);
-    formData.append("dailyHours", dailyHours.toString()); // إرسال الساعات المحسوبة للسيرفر
+    formData.append("dailyHours", dailyHours.toString());
 
     const data = Object.fromEntries(formData);
     const res = await addEmployee(data);
@@ -64,7 +60,6 @@ export default function AddEmployeeForm({ branches }: { branches: any[] }) {
               <input name="password" type="password" placeholder="كلمة المرور" required className="w-full p-3 bg-slate-50 border rounded-xl" />
               <input name="department" placeholder="القسم" required className="w-full p-3 bg-slate-50 border rounded-xl" />
 
-              {/* الصلاحيات والفروع */}
               <div className="md:col-span-2 bg-blue-50 p-5 rounded-2xl border border-blue-100">
                 <label className="block text-sm font-bold text-blue-800 mb-3 flex items-center gap-2"><Globe size={18} /> نطاق البصمة الجغرافي</label>
                 <div className="grid grid-cols-2 gap-4">
@@ -79,7 +74,6 @@ export default function AddEmployeeForm({ branches }: { branches: any[] }) {
                 )}
               </div>
 
-              {/* 👈 المواعيد الديناميكية */}
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <div>
                   <label className="flex items-center gap-1 text-xs font-bold text-slate-500 mb-2"><Clock size={14}/> الحضور الإلزامي</label>
@@ -91,14 +85,12 @@ export default function AddEmployeeForm({ branches }: { branches: any[] }) {
                 </div>
                 <div>
                   <label className="flex items-center gap-1 text-xs font-bold text-blue-600 mb-2"><Calculator size={14}/> ساعات العمل يومياً</label>
-                  {/* يتم عرض الساعات المحسوبة هنا للمدير للتأكد */}
                   <div className="w-full p-3 bg-blue-100 text-blue-800 border border-blue-200 rounded-xl font-black text-center">
                     {dailyHours} ساعات
                   </div>
                 </div>
               </div>
 
-              {/* الإجازات والرواتب */}
               <div>
                  <label className="block text-xs font-bold text-slate-500 mb-1">يوم الإجازة الأسبوعي</label>
                  <select name="offDay" className="w-full p-3 bg-slate-50 border rounded-xl font-bold">
@@ -115,6 +107,16 @@ export default function AddEmployeeForm({ branches }: { branches: any[] }) {
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">ساعات عمل يوم الإجازة (إن وجدت)</label>
                 <input name="offDayHours" type="number" defaultValue="0" className="w-full p-3 bg-slate-50 border rounded-xl" />
+              </div>
+
+              {/* New Salary Type Dropdown */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">نوع القبض</label>
+                <select name="salaryType" defaultValue="MONTHLY" className="w-full p-3 bg-slate-50 border rounded-xl font-bold">
+                  <option value="DAILY">يومي</option>
+                  <option value="WEEKLY">اسبوعي</option>
+                  <option value="MONTHLY">شهري</option>
+                </select>
               </div>
 
               <div>

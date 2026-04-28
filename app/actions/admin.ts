@@ -54,6 +54,7 @@ export async function addEmployee(data: any) {
         timeIn: data.timeIn,
         timeOut: data.timeOut,
         allowDist: parseInt(data.allowDist || "50"),
+        salaryType: data.salaryType, // Add salaryType to the create payload
       }
     });
     
