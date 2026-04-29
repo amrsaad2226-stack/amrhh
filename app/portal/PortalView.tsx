@@ -33,27 +33,31 @@ export default function PortalView({
 
   const exportToPDF = async () => {
     try {
-      // Dynamic import عشان يشتغل على المتصفح بس
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
-
       const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+
+      // تحميل الخط العربي (Tajawal)
+      const tajawalFont = await fetch('/fonts/Tajawal-Regular.ttf').then(res => res.arrayBuffer());
+      doc.addFileToVFS('Tajawal-Regular.ttf', btoa(String.fromCharCode(...new Uint8Array(tajawalFont))));
+      doc.addFont('Tajawal-Regular.ttf', 'Tajawal', 'normal');
+      doc.setFont('Tajawal');
+
       const tableColumn = ["تاريخ", "حضور", "انصراف", "س. فعلية", "اضافي/عجز", "صافي"];
       const tableRows: any[][] = [];
 
       employee.attendances?.forEach((record: any) => {
         const requiredHours = employee.dailyHours || 8;
         const difference = record.checkOut ? record.duration - requiredHours : 0;
-        const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) 
-          ? employee.dailySalary / employee.dailyHours 
+        const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0)
+          ? employee.dailySalary / employee.dailyHours
           : 0;
         const netDailyEarning = record.duration * hourlyRate;
-
         const rowData = [
           new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
           new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-          record.checkOut 
-            ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) 
+          record.checkOut
+            ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
             : '--:--',
           record.duration.toFixed(2),
           difference.toFixed(2),
@@ -67,14 +71,23 @@ export default function PortalView({
         body: tableRows,
         startY: 10,
         theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246] } // أزرق
+        styles: {
+          fontSize: 9,
+          cellPadding: 2,
+          font: 'Tajawal', // استخدام الخط العربي
+          halign: 'right' // المحاذاة لليمين
+        },
+        headStyles: {
+          fillColor: [59, 130, 246],
+          font: 'Tajawal',
+          halign: 'right'
+        }
       });
       
       doc.save(`attendance_${employee.code}.pdf`);
     } catch (error) {
       console.error("Error exporting PDF:", error);
-      alert("حدث خطأ أثناء تصدير الملف. تأكد من تثبيت المكتبات المطلوبة.");
+      alert("حدث خطأ أثناء تصدير الملف.");
     }
   };
 
