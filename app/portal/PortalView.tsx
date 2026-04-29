@@ -85,6 +85,8 @@ export default function PortalView({
             {employee.attendances.map((record: any) => {
               const requiredHours = employee.dailyHours || 8;
               const difference = record.checkOut ? record.duration - requiredHours : 0;
+              const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) ? employee.dailySalary / employee.dailyHours : 0;
+              const netDailyEarning = record.duration * hourlyRate;
 
               return (
                 <div key={record.id} className="relative flex gap-4 group">
@@ -100,10 +102,7 @@ export default function PortalView({
                           {new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
                         </p>
                       </div>
-                      <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
-                        record.checkOut 
-                        ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' 
-                        : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse'}`}>
+                      <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${record.checkOut ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse'}`}>
                         {record.checkOut ? 'مكتمل' : 'جاري العمل'}
                       </div>
                     </div>
@@ -121,25 +120,29 @@ export default function PortalView({
                     </div>
                     
                     {record.duration > 0 && (
-                      <div className="mt-4 grid grid-cols-2 gap-x-6 border-t border-slate-100 dark:border-slate-800 pt-4">
-                        <div className="flex items-center justify-between text-xs">
-                           <span className="font-bold text-slate-400">س. فعلية</span>
-                           <span className="font-black text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                             <Clock size={12} />
-                             {record.duration.toFixed(2)}
-                           </span>
+                      <div className="mt-4 grid grid-cols-3 gap-x-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">س. فعلية</span>
+                          <span className="text-sm font-black text-blue-600 dark:text-blue-400 mt-1 block">
+                            {record.duration.toFixed(2)}
+                          </span>
                         </div>
                         
-                        {record.checkOut && difference !== 0 && (
-                          <div className="flex items-center justify-between text-xs">
-                             <span className={`font-bold ${difference > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                               {difference > 0 ? 'إضافي' : 'عجز'}
-                             </span>
-                             <span className={`font-black flex items-center gap-1 ${difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                               {Math.abs(difference).toFixed(2)}
-                             </span>
-                          </div>
-                        )}
+                        <div className="text-center">
+                          <span className={`text-xs font-bold block ${!record.checkOut || difference === 0 ? 'text-slate-400' : difference > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {record.checkOut && difference !== 0 ? (difference > 0 ? 'إضافي' : 'عجز') : '---'}
+                          </span>
+                          <span className={`text-sm font-black mt-1 block ${!record.checkOut || difference === 0 ? 'text-slate-400' : difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {record.checkOut && difference !== 0 ? Math.abs(difference).toFixed(2) : '-'}
+                          </span>
+                        </div>
+
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">الصافي</span>
+                          <span className="text-sm font-black text-slate-700 dark:text-slate-200 mt-1 block">
+                            {netDailyEarning.toFixed(2)} ج
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
