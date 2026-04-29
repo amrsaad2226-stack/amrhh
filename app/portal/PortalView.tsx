@@ -4,8 +4,6 @@ import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import SalaryDashboard from "./_components/SalaryDashboard";
 import { Clock, Calendar, ChevronLeft, History, Download } from "lucide-react";
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 interface PortalViewProps {
   employee: any;
@@ -33,9 +31,12 @@ export default function PortalView({
     setIsInitializing(false);
   }, []);
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
+    const { default: jsPDF } = await import('jspdf');
+    const autoTable = (await import('jspdf-autotable')).default;
+
     const doc = new jsPDF();
-    const tableColumn = ["تاريخ", "حضور", "انصراف", "س. فعلية", "اضافي/عجز", "صافي"];
+    const tableColumn = ["صافي", "اضافي/عجز", "س. فعلية", "انصراف", "حضور", "تاريخ"];
     const tableRows: any[][] = [];
 
     employee.attendances.forEach((record: any) => {
@@ -45,17 +46,33 @@ export default function PortalView({
       const netDailyEarning = record.duration * hourlyRate;
 
       const rowData = [
-        new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
-        new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-        record.checkOut ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--',
-        record.duration.toFixed(2),
+        netDailyEarning.toFixed(2) + ' ج',
         difference.toFixed(2),
-        netDailyEarning.toFixed(2) + ' ج'
+        record.duration.toFixed(2),
+        record.checkOut ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+        new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })
       ];
       tableRows.push(rowData);
     });
 
-    (doc as any).autoTable(tableColumn, tableRows, { startY: 20 });
+    doc.addFont('/fonts/Cairo-Regular.ttf', 'Cairo', 'normal');
+    doc.setFont('Cairo');
+    doc.text(`تقرير حضور الموظف: ${employee.name}`, 14, 15);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      styles: {
+        font: 'Cairo',
+        halign: 'right',
+      },
+      headStyles: {
+        fillColor: [41, 128, 185]
+      }
+    });
+
     doc.save(`attendance_${employee.code}.pdf`);
   };
 
