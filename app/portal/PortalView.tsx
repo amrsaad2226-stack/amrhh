@@ -3,7 +3,10 @@ import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import SalaryDashboard from "./_components/SalaryDashboard";
-import { Clock, Calendar, ChevronLeft, History, Download } from "lucide-react";
+import { Clock, Calendar, ChevronLeft, History } from "lucide-react";
+import dynamic from 'next/dynamic';
+
+const ExportButton = dynamic(() => import('./_components/ExportButton'), { ssr: false });
 
 interface PortalViewProps {
   employee: any;
@@ -30,51 +33,6 @@ export default function PortalView({
     setDeviceId(getDeviceId());
     setIsInitializing(false);
   }, []);
-
-  const exportToPDF = async () => {
-    const { default: jsPDF } = await import('jspdf');
-    const autoTable = (await import('jspdf-autotable')).default;
-
-    const doc = new jsPDF();
-    const tableColumn = ["صافي", "اضافي/عجز", "س. فعلية", "انصراف", "حضور", "تاريخ"];
-    const tableRows: any[][] = [];
-
-    employee.attendances.forEach((record: any) => {
-      const requiredHours = employee.dailyHours || 8;
-      const difference = record.checkOut ? record.duration - requiredHours : 0;
-      const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) ? employee.dailySalary / employee.dailyHours : 0;
-      const netDailyEarning = record.duration * hourlyRate;
-
-      const rowData = [
-        netDailyEarning.toFixed(2) + ' ج',
-        difference.toFixed(2),
-        record.duration.toFixed(2),
-        record.checkOut ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--',
-        new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-        new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })
-      ];
-      tableRows.push(rowData);
-    });
-
-    doc.addFont('/fonts/Cairo-Regular.ttf', 'Cairo', 'normal');
-    doc.setFont('Cairo');
-    doc.text(`تقرير حضور الموظف: ${employee.name}`, 14, 15);
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 20,
-      styles: {
-        font: 'Cairo',
-        halign: 'right',
-      },
-      headStyles: {
-        fillColor: [41, 128, 185]
-      }
-    });
-
-    doc.save(`attendance_${employee.code}.pdf`);
-  };
 
   if (isInitializing) {
     return (
@@ -121,9 +79,7 @@ export default function PortalView({
             سجل النشاط
           </h3>
           <div className="flex items-center gap-2">
-            <button onClick={exportToPDF} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <Download size={20} className="text-slate-500" />
-            </button>
+            <ExportButton employee={employee} />
             <span className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
               آخر 7 أيام
             </span>
@@ -183,7 +139,7 @@ export default function PortalView({
                             {record.checkOut && difference !== 0 ? (difference > 0 ? 'إضافي' : 'عجز') : '---'}
                           </span>
                           <span className={`text-sm font-black mt-1 block ${!record.checkOut || difference === 0 ? 'text-slate-400' : difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {record.checkOut && difference !== 0 ? Math.abs(difference).toFixed(2) : '-'}
+                            {record.checkOut && difference !== 0 ? Math.abs(difference).toFixed(2) : '-'}                            
                           </span>
                         </div>
 
