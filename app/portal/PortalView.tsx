@@ -80,7 +80,8 @@ export default function PortalView({
         headStyles: {
           fillColor: [59, 130, 246],
           font: 'Tajawal',
-          halign: 'right'
+          halign: 'right',
+          fontStyle: 'normal'
         }
       });
       
