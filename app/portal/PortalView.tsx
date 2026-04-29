@@ -10,8 +10,8 @@ interface PortalViewProps {
   isCurrentlyIn: boolean;
   totalEarnings: number;
   totalHours: number;
-  targetHours: number; // Changed from monthlyTarget
-  periodLabel: string; // Added for dynamic period
+  targetHours: number;
+  periodLabel: string;
 }
 
 export default function PortalView({ 
@@ -19,8 +19,8 @@ export default function PortalView({
   isCurrentlyIn, 
   totalEarnings, 
   totalHours, 
-  targetHours, // Changed
-  periodLabel // Added
+  targetHours, 
+  periodLabel
 }: PortalViewProps) {
   
   const [deviceId, setDeviceId] = useState<string>("");
@@ -63,8 +63,8 @@ export default function PortalView({
       <SalaryDashboard 
         totalEarnings={totalEarnings} 
         totalHours={totalHours}
-        targetHours={targetHours} // Changed
-        periodLabel={periodLabel} // Added
+        targetHours={targetHours}
+        periodLabel={periodLabel}
       />
 
       <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
@@ -82,53 +82,70 @@ export default function PortalView({
 
         {employee.attendances && employee.attendances.length > 0 ? (
           <div className="relative space-y-6 before:absolute before:inset-0 before:mr-5 before:-ml-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-500 before:to-transparent before:opacity-20">
-            {employee.attendances.map((record: any, index: number) => (
-              <div key={record.id} className="relative flex gap-4 group">
-                <div className="absolute right-0 translate-x-1/2 mt-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow-sm z-10 dark:border-slate-900"></div>
+            {employee.attendances.map((record: any) => {
+              const requiredHours = employee.dailyHours || 8;
+              const difference = record.checkOut ? record.duration - requiredHours : 0;
 
-                <div className="mr-8 flex-1 bg-white dark:bg-slate-900 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-all hover:-translate-y-1">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-bold text-slate-800 dark:text-slate-200">
-                        {new Date(record.date).toLocaleDateString('ar-EG', { weekday: 'long' })}
-                      </h4>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">
-                        {new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
-                      </p>
-                    </div>
-                    <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
-                      record.checkOut 
-                      ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' 
-                      : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse'
-                    }`}>
-                      {record.checkOut ? 'مكتمل' : 'جاري العمل'}
-                    </div>
-                  </div>
+              return (
+                <div key={record.id} className="relative flex gap-4 group">
+                  <div className="absolute right-0 translate-x-1/2 mt-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow-sm z-10 dark:border-slate-900"></div>
 
-                  <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
-                    <div className="flex items-center gap-1.5">
-                       <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                       {new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                  <div className="mr-8 flex-1 bg-white dark:bg-slate-900 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-all hover:-translate-y-1">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200">
+                          {new Date(record.date).toLocaleDateString('ar-EG', { weekday: 'long' })}
+                        </h4>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">
+                          {new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
+                        </p>
+                      </div>
+                      <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
+                        record.checkOut 
+                        ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' 
+                        : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse'}`}>
+                        {record.checkOut ? 'مكتمل' : 'جاري العمل'}
+                      </div>
                     </div>
-                    <ChevronLeft size={14} className="text-slate-300" />
-                    <div className="flex items-center gap-1.5">
-                       <div className={`w-1.5 h-1.5 rounded-full ${record.checkOut ? 'bg-red-500' : 'bg-slate-300'}`}></div>
-                       {record.checkOut ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+
+                    <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
+                      <div className="flex items-center gap-1.5">
+                         <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                         {new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <ChevronLeft size={14} className="text-slate-300" />
+                      <div className="flex items-center gap-1.5">
+                         <div className={`w-1.5 h-1.5 rounded-full ${record.checkOut ? 'bg-red-500' : 'bg-slate-300'}`}></div>
+                         {record.checkOut ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                      </div>
                     </div>
+                    
+                    {record.duration > 0 && (
+                      <div className="mt-4 grid grid-cols-2 gap-x-6 border-t border-slate-100 dark:border-slate-800 pt-4">
+                        <div className="flex items-center justify-between text-xs">
+                           <span className="font-bold text-slate-400">س. فعلية</span>
+                           <span className="font-black text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                             <Clock size={12} />
+                             {record.duration.toFixed(2)}
+                           </span>
+                        </div>
+                        
+                        {record.checkOut && difference !== 0 && (
+                          <div className="flex items-center justify-between text-xs">
+                             <span className={`font-bold ${difference > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                               {difference > 0 ? 'إضافي' : 'عجز'}
+                             </span>
+                             <span className={`font-black flex items-center gap-1 ${difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                               {Math.abs(difference).toFixed(2)}
+                             </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  
-                  {record.duration > 0 && (
-                    <div className="mt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
-                       <span className="text-xs font-bold text-slate-400">ساعات العمل الفعلية</span>
-                       <span className="text-sm font-black text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                         <Clock size={14} />
-                         {record.duration.toFixed(2)} ساعة
-                       </span>
-                    </div>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-10 px-6 bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
