@@ -3,10 +3,7 @@ import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import SalaryDashboard from "./_components/SalaryDashboard";
-import { Clock, Calendar, ChevronLeft, History } from "lucide-react";
-import dynamic from 'next/dynamic';
-
-const ExportButton = dynamic(() => import('./_components/ExportButton'), { ssr: false });
+import { Clock, Calendar, ChevronLeft, History, Download } from "lucide-react";
 
 interface PortalViewProps {
   employee: any;
@@ -33,6 +30,53 @@ export default function PortalView({
     setDeviceId(getDeviceId());
     setIsInitializing(false);
   }, []);
+
+  const exportToPDF = async () => {
+    try {
+      // Dynamic import عشان يشتغل على المتصفح بس
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
+
+      const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+      const tableColumn = ["تاريخ", "حضور", "انصراف", "س. فعلية", "اضافي/عجز", "صافي"];
+      const tableRows: any[][] = [];
+
+      employee.attendances?.forEach((record: any) => {
+        const requiredHours = employee.dailyHours || 8;
+        const difference = record.checkOut ? record.duration - requiredHours : 0;
+        const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) 
+          ? employee.dailySalary / employee.dailyHours 
+          : 0;
+        const netDailyEarning = record.duration * hourlyRate;
+
+        const rowData = [
+          new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
+          new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+          record.checkOut 
+            ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) 
+            : '--:--',
+          record.duration.toFixed(2),
+          difference.toFixed(2),
+          netDailyEarning.toFixed(2) + ' ج'
+        ];
+        tableRows.push(rowData);
+      });
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 10,
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [59, 130, 246] } // أزرق
+      });
+      
+      doc.save(`attendance_${employee.code}.pdf`);
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      alert("حدث خطأ أثناء تصدير الملف. تأكد من تثبيت المكتبات المطلوبة.");
+    }
+  };
 
   if (isInitializing) {
     return (
@@ -79,7 +123,13 @@ export default function PortalView({
             سجل النشاط
           </h3>
           <div className="flex items-center gap-2">
-            <ExportButton employee={employee} />
+            <button 
+              onClick={exportToPDF} 
+              className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="تصدير PDF"
+            >
+              <Download size={20} className="text-slate-500" />
+            </button>
             <span className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
               آخر 7 أيام
             </span>
@@ -91,7 +141,9 @@ export default function PortalView({
             {employee.attendances.map((record: any) => {
               const requiredHours = employee.dailyHours || 8;
               const difference = record.checkOut ? record.duration - requiredHours : 0;
-              const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) ? employee.dailySalary / employee.dailyHours : 0;
+              const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) 
+                ? employee.dailySalary / employee.dailyHours 
+                : 0;
               const netDailyEarning = record.duration * hourlyRate;
 
               return (
@@ -108,7 +160,11 @@ export default function PortalView({
                           {new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
                         </p>
                       </div>
-                      <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${record.checkOut ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse'}`}>
+                      <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
+                        record.checkOut 
+                          ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' 
+                          : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse'
+                      }`}>
                         {record.checkOut ? 'مكتمل' : 'جاري العمل'}
                       </div>
                     </div>
@@ -121,7 +177,9 @@ export default function PortalView({
                       <ChevronLeft size={14} className="text-slate-300" />
                       <div className="flex items-center gap-1.5">
                          <div className={`w-1.5 h-1.5 rounded-full ${record.checkOut ? 'bg-red-500' : 'bg-slate-300'}`}></div>
-                         {record.checkOut ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                         {record.checkOut 
+                           ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) 
+                           : '--:--'}
                       </div>
                     </div>
                     
@@ -135,11 +193,17 @@ export default function PortalView({
                         </div>
                         
                         <div className="text-center">
-                          <span className={`text-xs font-bold block ${!record.checkOut || difference === 0 ? 'text-slate-400' : difference > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          <span className={`text-xs font-bold block ${
+                            !record.checkOut || difference === 0 ? 'text-slate-400' : 
+                            difference > 0 ? 'text-green-500' : 'text-red-500'
+                          }`}>
                             {record.checkOut && difference !== 0 ? (difference > 0 ? 'إضافي' : 'عجز') : '---'}
                           </span>
-                          <span className={`text-sm font-black mt-1 block ${!record.checkOut || difference === 0 ? 'text-slate-400' : difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {record.checkOut && difference !== 0 ? Math.abs(difference).toFixed(2) : '-'}                            
+                          <span className={`text-sm font-black mt-1 block ${
+                            !record.checkOut || difference === 0 ? 'text-slate-400' : 
+                            difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {record.checkOut && difference !== 0 ? Math.abs(difference).toFixed(2) : '-'}
                           </span>
                         </div>
 
