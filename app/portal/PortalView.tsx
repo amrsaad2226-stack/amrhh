@@ -3,7 +3,9 @@ import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import SalaryDashboard from "./_components/SalaryDashboard";
-import { Clock, Calendar, ChevronLeft, History } from "lucide-react";
+import { Clock, Calendar, ChevronLeft, History, Download } from "lucide-react";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface PortalViewProps {
   employee: any;
@@ -30,6 +32,32 @@ export default function PortalView({
     setDeviceId(getDeviceId());
     setIsInitializing(false);
   }, []);
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["تاريخ", "حضور", "انصراف", "س. فعلية", "اضافي/عجز", "صافي"];
+    const tableRows: any[][] = [];
+
+    employee.attendances.forEach((record: any) => {
+      const requiredHours = employee.dailyHours || 8;
+      const difference = record.checkOut ? record.duration - requiredHours : 0;
+      const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) ? employee.dailySalary / employee.dailyHours : 0;
+      const netDailyEarning = record.duration * hourlyRate;
+
+      const rowData = [
+        new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
+        new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+        record.checkOut ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '--:--',
+        record.duration.toFixed(2),
+        difference.toFixed(2),
+        netDailyEarning.toFixed(2) + ' ج'
+      ];
+      tableRows.push(rowData);
+    });
+
+    (doc as any).autoTable(tableColumn, tableRows, { startY: 20 });
+    doc.save(`attendance_${employee.code}.pdf`);
+  };
 
   if (isInitializing) {
     return (
@@ -75,9 +103,14 @@ export default function PortalView({
             <History className="text-blue-500" size={24} />
             سجل النشاط
           </h3>
-          <span className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-            آخر 7 أيام
-          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={exportToPDF} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <Download size={20} className="text-slate-500" />
+            </button>
+            <span className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+              آخر 7 أيام
+            </span>
+          </div>
         </div>
 
         {employee.attendances && employee.attendances.length > 0 ? (
