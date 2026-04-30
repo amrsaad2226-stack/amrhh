@@ -4,7 +4,11 @@ import { getDistance } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 
 const getCurrentCairoTime = () => {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+  const now = new Date();
+  // We will store the date as is (in UTC). The database and server will handle it as UTC.
+  // The frontend will display it based on user's browser timezone, which is what we reverted to.
+  // This is the simplest and most robust approach.
+  return now;
 };
 
 export async function checkInAction(code: string, lat: number, lng: number, deviceId: string) {
