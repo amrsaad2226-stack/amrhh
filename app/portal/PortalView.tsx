@@ -54,10 +54,10 @@ export default function PortalView({
           : 0;
         const netDailyEarning = record.duration * hourlyRate;
         const rowData = [
-          new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', timeZone: 'Africa/Cairo' }),
-          new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Cairo' }),
+          new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
+          new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
           record.checkOut
-            ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Cairo' })
+            ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
             : '--:--',
           record.duration.toFixed(2),
           difference.toFixed(2),
@@ -168,10 +168,10 @@ export default function PortalView({
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h4 className="font-bold text-slate-800 dark:text-slate-200">
-                          {new Date(record.date).toLocaleDateString('ar-EG', { weekday: 'long', timeZone: 'Africa/Cairo' })}
+                          {new Date(record.date).toLocaleDateString('ar-EG', { weekday: 'long' })}
                         </h4>
                         <p className="text-xs text-slate-400 font-medium mt-0.5">
-                          {new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', timeZone: 'Africa/Cairo' })}
+                          {new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
                         </p>
                       </div>
                       <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
@@ -186,13 +186,13 @@ export default function PortalView({
                     <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
                       <div className="flex items-center gap-1.5">
                          <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                         {new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Cairo' })}
+                         {new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                       <ChevronLeft size={14} className="text-slate-300" />
                       <div className="flex items-center gap-1.5">
                          <div className={`w-1.5 h-1.5 rounded-full ${record.checkOut ? 'bg-red-500' : 'bg-slate-300'}`}></div>
                          {record.checkOut 
-                           ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Cairo' }) 
+                           ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) 
                            : '--:--'}
                       </div>
                     </div>
