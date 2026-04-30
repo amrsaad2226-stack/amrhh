@@ -3,6 +3,10 @@ import db from "@/lib/db";
 import { getDistance } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 
+const getCurrentCairoTime = () => {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Africa/Cairo" }));
+};
+
 export async function checkInAction(code: string, lat: number, lng: number, deviceId: string) {
   try {
     const employee = await db.employee.findUnique({
@@ -54,8 +58,8 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       return { error: "أنت مسجل حضور بالفعل! يجب تسجيل الانصراف أولاً." };
     }
 
-    const now = new Date();
-    const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
+    const now = getCurrentCairoTime();
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
 
     await db.attendance.create({
@@ -120,7 +124,7 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
 
     if (!lastSession) return { error: "لا يوجد سجل حضور مفتوح حالياً." };
 
-    const now = new Date();
+    const now = getCurrentCairoTime();
     const checkInTime = new Date(lastSession.checkIn!);
     const diffInMs = now.getTime() - checkInTime.getTime();
     const durationHours = diffInMs / (1000 * 60 * 60);
