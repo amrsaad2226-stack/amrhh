@@ -1,7 +1,6 @@
 "use server";
-import prisma from "@/lib/db"; // أو المسار الصحيح لقاعدة البيانات عندك
+import prisma from "@/lib/db"; 
 
-// 1. استدعاء الموظفين للقائمة المنسدلة
 export async function getEmployeesList() {
   try {
     return await prisma.employee.findMany({
@@ -13,10 +12,8 @@ export async function getEmployeesList() {
   }
 }
 
-// 2. استدعاء السجلات بناءً على الفلتر فقط
 export async function getDetailedLog(empId: string, startDate: string, endDate: string) {
   try {
-    // تجهيز شروط البحث
     const whereClause: any = {
       date: {
         gte: new Date(startDate),
@@ -24,13 +21,10 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
       },
     };
     
-    // تحويل الـ empId إلى رقم إذا تم تحديده، لأن قاعدة بياناتك تستخدم أرقاماً
     if (empId) whereClause.employeeId = Number(empId);
 
-    // استدعاء البيانات
     const records = await prisma.attendance.findMany({
       where: whereClause,
-      // 👈👈 التعديل هنا: استدعاء كامل بيانات الموظف لضمان وصول الاسم
       include: {
         employee: true 
       },
@@ -49,34 +43,29 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
         currentEmpId = record.employeeId;
       }
 
-      // 👈👈 جلب البيانات الحقيقية من قاعدة بياناتك
-      const empDailyHours = record.employee.dailyHours || 8; // 8 كقيمة احتياطية لو الحقل فارغ
+      const empDailyHours = record.employee.dailyHours || 8;
       const empDailySalary = record.employee.dailySalary || 0;
 
-      // 👈 حساب أجر الساعة الحقيقي: (الراتب اليومي ÷ عدد الساعات الافتراضية)
       const hourlyRate = empDailyHours > 0 ? (empDailySalary / empDailyHours) : 0;
 
       let actualHours = 0;
       if (record.checkIn && record.checkOut) {
-        // حساب الفارق الفعلي بالساعات
         actualHours = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
       }
 
-      // حساب العجز والإضافي بناءً على ساعات الموظف الافتراضية (empDailyHours)
       const deficit = actualHours > 0 && actualHours < empDailyHours ? empDailyHours - actualHours : 0;
       const overtime = actualHours > empDailyHours ? actualHours - empDailyHours : 0;
       
-      // حساب ما استحقه فعلياً في هذا اليوم
       const dailyEarned = actualHours * hourlyRate;
       cumulativeBalance += dailyEarned;
 
       return {
         id: record.id,
-        empName: record.employee.name, // 👈 الآن سيتم استدعاء الاسم بنجاح
+        empName: record.employee.name,
         defaultHrs: empDailyHours, 
-        date: record.date.toISOString().split("T")[0],
-        checkIn: record.checkIn ? record.checkIn.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "---",
-        checkOut: record.checkOut ? record.checkOut.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "---",
+        date: record.date.toISOString(), // Keep as full ISO string
+        checkIn: record.checkIn ? record.checkIn.toISOString() : null, // Keep as full ISO string
+        checkOut: record.checkOut ? record.checkOut.toISOString() : null, // Keep as full ISO string
         actualHrs: actualHours.toFixed(1),
         deficit: deficit.toFixed(1),
         overtime: overtime.toFixed(1),
