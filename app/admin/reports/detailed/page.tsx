@@ -5,31 +5,54 @@ import { getEmployeesList, getDetailedLog } from "@/app/actions/reports";
 import { Search, Filter, Calendar, Loader2, Database, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
+// دالة مساعدة لتحويل التوقيت
+const formatTime = (dateString: string | null) => {
+  if (!dateString) return "--:--";
+  try {
+    return new Date(dateString).toLocaleTimeString('ar-EG', { 
+      timeZone: 'Africa/Cairo', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  } catch (e) {
+    return "تاريخ خاطئ";
+  }
+}
+
+const formatDate = (dateString: string | null) => {
+  if (!dateString) return "-";
+  try {
+    return new Date(dateString).toLocaleDateString('ar-EG', { 
+      timeZone: 'Africa/Cairo', 
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return "تاريخ خاطئ";
+  }
+}
+
 export default function DetailedLogPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   
-  // حالات الفلتر
   const [selectedEmpId, setSelectedEmpId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   
-  // حالات البيانات
   const [isFetching, setIsFetching] = useState(false);
   const [records, setRecords] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   
-  // الفلتر الحي (Live Search)
   const [liveSearchQuery, setLiveSearchQuery] = useState("");
 
-  // جلب قائمة الموظفين عند فتح الشاشة فقط
   useEffect(() => {
     async function loadEmps() {
       const data = await getEmployeesList();
       setEmployees(data);
       setLoadingInitial(false);
       
-      // تعيين التاريخ الافتراضي (أول الشهر لليوم)
       const today = new Date();
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
       setStartDate(firstDay.toISOString().split("T")[0]);
@@ -38,7 +61,6 @@ export default function DetailedLogPage() {
     loadEmps();
   }, []);
 
-  // دالة زر "تطبيق الفلتر وجلب البيانات"
   const handleFetchData = async () => {
     if (!startDate || !endDate) {
       return toast.error("يرجى تحديد تاريخ البداية والنهاية");
@@ -57,15 +79,13 @@ export default function DetailedLogPage() {
     setIsFetching(false);
   };
 
-  // فلترة السجلات حياً (Client-side filtering)
   const filteredRecords = records.filter(record => 
     record.empName.toLowerCase().includes(liveSearchQuery.toLowerCase()) ||
-    record.date.includes(liveSearchQuery)
+    formatDate(record.date).includes(liveSearchQuery)
   );
 
   return (
     <div className="p-4 md:p-8 space-y-6" dir="rtl">
-      {/* رأس الشاشة */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
         <div>
           <h1 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2">
@@ -77,10 +97,8 @@ export default function DetailedLogPage() {
         </div>
       </div>
 
-      {/* لوحة الفلاتر (لا يتم استدعاء البيانات إلا بالضغط على الزر) */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         
-        {/* قائمة منسدلة للموظفين (أو الكل) */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-500 dark:text-slate-400">الموظف</label>
           {loadingInitial ? (
@@ -99,7 +117,6 @@ export default function DetailedLogPage() {
           )}
         </div>
 
-        {/* من تاريخ */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-500 dark:text-slate-400">من تاريخ</label>
           <input 
@@ -110,7 +127,6 @@ export default function DetailedLogPage() {
           />
         </div>
 
-        {/* إلى تاريخ */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-500 dark:text-slate-400">إلى تاريخ</label>
           <input 
@@ -121,7 +137,6 @@ export default function DetailedLogPage() {
           />
         </div>
 
-        {/* زر التطبيق */}
         <button 
           onClick={handleFetchData}
           disabled={isFetching}
@@ -132,9 +147,7 @@ export default function DetailedLogPage() {
         </button>
       </div>
 
-      {/* منطقة عرض البيانات */}
       {!hasSearched ? (
-        // حالة عدم البحث بعد (Empty State)
         <div className="bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[40vh]">
           <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 w-20 h-20 rounded-full flex items-center justify-center mb-4">
             <Search size={40} />
@@ -145,17 +158,14 @@ export default function DetailedLogPage() {
           </p>
         </div>
       ) : records.length === 0 ? (
-        // حالة لا يوجد بيانات
         <div className="bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[40vh]">
           <AlertCircle size={48} className="text-slate-400 mb-4" />
           <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">لا توجد سجلات</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">لا يوجد حضور وانصراف يطابق الفلتر الذي حددته.</p>
         </div>
       ) : (
-        // عرض الجدول مع البحث الحي
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col">
           
-          {/* حقل البحث الحي */}
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
             <div className="relative">
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -169,7 +179,6 @@ export default function DetailedLogPage() {
             </div>
           </div>
 
-          {/* الجدول المنسق */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-right whitespace-nowrap">
               <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-black border-b border-slate-200 dark:border-slate-800">
@@ -189,9 +198,9 @@ export default function DetailedLogPage() {
                 {filteredRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="p-4">{record.empName}</td>
-                    <td className="p-4 text-center font-mono text-xs">{record.date}</td>
-                    <td className="p-4 text-center">{record.checkIn}</td>
-                    <td className="p-4 text-center">{record.checkOut}</td>
+                    <td className="p-4 text-center font-mono text-xs">{formatDate(record.date)}</td>
+                    <td className="p-4 text-center">{formatTime(record.checkIn)}</td>
+                    <td className="p-4 text-center">{formatTime(record.checkOut)}</td>
                     <td className="p-4 text-center bg-slate-50 dark:bg-slate-950 text-slate-500">{record.defaultHrs}</td>
                     <td className="p-4 text-center text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">{record.actualHrs}</td>
                     <td className="p-4 text-center text-red-500 bg-red-50/50 dark:bg-red-900/10">{record.deficit > 0 ? record.deficit : "-"}</td>
