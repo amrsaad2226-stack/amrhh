@@ -79,3 +79,66 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
     return { error: "حدث خطأ أثناء جلب البيانات" };
   }
 }
+
+// دالة حذف سجل الحضور
+export async function deleteAttendanceRecord(id: number) {
+  try {
+    await prisma.attendance.delete({ where: { id } });
+    return { success: true };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء حذف السجل" };
+  }
+}
+
+// دالة تعديل وقت الحضور والانصراف
+export async function updateAttendanceRecord(id: number, checkInTime: string | null, checkOutTime: string | null) {
+  try {
+    const existing = await prisma.attendance.findUnique({
+      where: { id },
+      include: { employee: true }
+    });
+
+    if (!existing) return { error: "السجل غير موجود" };
+
+    let newCheckIn = existing.checkIn;
+    let newCheckOut = existing.checkOut;
+
+    // دالة مساعدة لدمج الوقت الجديد (HH:mm) مع تاريخ السجل الأصلي
+    const applyTime = (baseDate: Date, timeStr: string) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      const newDate = new Date(baseDate);
+      newDate.setHours(hours, minutes, 0, 0);
+      return newDate;
+    };
+
+    if (checkInTime) newCheckIn = applyTime(existing.date, checkInTime);
+    if (checkOutTime) newCheckOut = applyTime(existing.date, checkOutTime);
+
+    // تحديث ساعات العمل (Duration) والإضافي (Overtime) في قاعدة البيانات
+    let duration = 0;
+    let overtime = 0;
+    if (newCheckIn && newCheckOut) {
+      duration = (newCheckOut.getTime() - newCheckIn.getTime()) / (1000 * 60 * 60);
+      if (duration < 0) duration += 24; // للورديات المسائية عبر منتصف الليل
+      
+      const requiredHours = existing.requiredHours || existing.employee.dailyHours || 10;
+      if (duration > requiredHours) {
+        overtime = duration - requiredHours;
+      }
+    }
+
+    await prisma.attendance.update({
+      where: { id },
+      data: {
+        checkIn: newCheckIn,
+        checkOut: newCheckOut,
+        duration: duration,
+        overtime: overtime
+      }
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء تعديل السجل" };
+  }
+}
