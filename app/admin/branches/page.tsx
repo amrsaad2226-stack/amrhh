@@ -1,7 +1,8 @@
 // app/admin/branches/page.tsx
 import db from "@/lib/db";
-import { MapPin, Building2 } from "lucide-react";
-import BranchForm from "./BranchForm"; // استيراد الفورم الجديد
+import { Building2 } from "lucide-react";
+import BranchForm from "./BranchForm"; 
+import BranchCard from "./BranchCard"; // 👈 استيراد كارت الفرع الجديد
 
 export default async function ManageBranches() {
   const branches = await db.branch.findMany({
@@ -20,26 +21,13 @@ export default async function ManageBranches() {
            </div>
         </div>
 
-        {/* استدعاء مكون الفورم الجديد هنا ✅ */}
+        {/* فورم إضافة فرع جديد */}
         <BranchForm />
 
         {/* قائمة الفروع */}
         <div className="grid gap-4 md:grid-cols-2">
           {branches.map(branch => (
-            <div key={branch.id} className="bg-white p-6 rounded-3xl border border-slate-100 flex justify-between items-center shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="bg-blue-50 p-4 rounded-2xl text-blue-600">
-                   <MapPin size={24} />
-                </div>
-                <div>
-                  <h3 className="font-black text-xl text-slate-800">{branch.name}</h3>
-                  <p className="text-xs text-slate-400 mt-1 font-mono">
-                    {branch.latitude.toFixed(6)}, {branch.longitude.toFixed(6)}
-                  </p>
-                </div>
-              </div>
-              <div className="text-green-600 text-xs font-bold bg-green-50 px-4 py-2 rounded-xl">نشط</div>
-            </div>
+            <BranchCard key={branch.id} branch={branch} /> // 👈 استخدام المكون الجديد هنا
           ))}
         </div>
       </div>

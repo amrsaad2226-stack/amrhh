@@ -30,6 +30,48 @@ export async function addBranch(formData: FormData) {
   }
 }
 
+export async function updateBranch(id: number, formData: FormData) {
+  try {
+    const name = formData.get("name") as string;
+    const latitude = parseFloat(formData.get("latitude") as string);
+    const longitude = parseFloat(formData.get("longitude") as string);
+
+    await db.branch.update({
+      where: { id },
+      data: { name, latitude, longitude },
+    });
+
+    revalidatePath("/admin/branches");
+    return { success: true };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء تعديل الفرع" };
+  }
+}
+
+export async function deleteBranch(id: number) {
+  try {
+    // التحقق من عدم وجود موظفين في هذا الفرع قبل الحذف
+    const branch = await db.branch.findUnique({
+      where: { id },
+      include: { employees: true },
+    });
+
+    if (branch && branch.employees.length > 0) {
+      return { error: "لا يمكن حذف هذا الفرع لوجود موظفين مرتبطين به." };
+    }
+
+    await db.branch.delete({
+      where: { id },
+    });
+
+    revalidatePath("/admin/branches");
+    return { success: true };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء حذف الفرع" };
+  }
+}
+
+
 // 2. إضافة موظف جديد
 export async function addEmployee(data: any) {
   try {
