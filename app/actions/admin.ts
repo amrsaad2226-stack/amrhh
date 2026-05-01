@@ -230,3 +230,17 @@ export async function updateEmployee(id: number, data: any) {
     return { error: "حدث خطأ أثناء تعديل بيانات الموظف" };
   }
 }
+
+export async function resetEmployeeDevice(employeeId: number) {
+  try {
+    await db.employee.update({
+      where: { id: employeeId },
+      data: { deviceId: null },
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء فك ارتباط الجهاز" };
+  }
+}

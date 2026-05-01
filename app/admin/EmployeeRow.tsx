@@ -2,38 +2,35 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Edit, Trash2, X, Save, Clock, DollarSign, Globe, Calculator } from "lucide-react";
+// 👈 أضفنا أيقونة RefreshCcw
+import { Edit, Trash2, X, Save, Clock, DollarSign, Globe, Calculator, RefreshCcw } from "lucide-react"; 
 import ActivateDeviceBtn from "./ActivateDeviceBtn";
-import { deleteEmployee, updateEmployee } from "@/app/actions/admin";
+// 👈 أضفنا دالة resetEmployeeDevice
+import { deleteEmployee, updateEmployee, resetEmployeeDevice } from "@/app/actions/admin"; 
 
 export default function EmployeeRow({ employee, branches }: { employee: any, branches: any[] }) {
   const[isEditOpen, setIsEditOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // حالات التعديل
   const [branchType, setBranchType] = useState(employee.isAnyBranch ? "OPEN" : "SPECIFIC");
   const [timeIn, setTimeIn] = useState(employee.timeIn);
   const [timeOut, setTimeOut] = useState(employee.timeOut);
   const [dailyHours, setDailyHours] = useState(employee.dailyHours);
 
-  // حساب الساعات تلقائياً عند تغيير الوقت في فورم التعديل
   useEffect(() => {
     const [inH, inM] = timeIn.split(':').map(Number);
     const [outH, outM] = timeOut.split(':').map(Number);
     let totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
     if (totalMinutes < 0) totalMinutes += 24 * 60; 
     setDailyHours(Math.round(totalMinutes / 60));
-  }, [timeIn, timeOut]);
+  },[timeIn, timeOut]);
 
   const handleDelete = async () => {
     if (!confirm(`هل أنت متأكد من حذف الموظف ${employee.name}؟`)) return;
     setLoading(true);
     const res = await deleteEmployee(employee.id);
-    if (res?.success) {
-      alert("✅ تم الحذف بنجاح");
-    } else {
-      alert("❌ " + res?.error);
-    }
+    if (res?.success) alert("✅ تم الحذف بنجاح");
+    else alert("❌ " + res?.error);
     setLoading(false);
   };
 
@@ -41,16 +38,23 @@ export default function EmployeeRow({ employee, branches }: { employee: any, bra
     setLoading(true);
     formData.append("branchType", branchType);
     formData.append("dailyHours", dailyHours.toString());
-
     const data = Object.fromEntries(formData);
     const res = await updateEmployee(employee.id, data);
     
     if (res?.success) {
       alert("✅ تم التعديل بنجاح");
       setIsEditOpen(false);
-    } else {
-      alert("❌ " + res?.error);
-    }
+    } else alert("❌ " + res?.error);
+    setLoading(false);
+  };
+
+  // 👈 دالة فك ارتباط الجهاز الجديدة
+  const handleResetDevice = async () => {
+    if (!confirm(`هل أنت متأكد من فك ارتباط جهاز الموظف ${employee.name}؟\n(سيتمكن من تسجيل الدخول من جهاز جديد)`)) return;
+    setLoading(true);
+    const res = await resetEmployeeDevice(employee.id);
+    if (res?.success) alert("✅ تم فك ارتباط الجهاز بنجاح. الموظف الآن حر في الدخول من جهاز جديد.");
+    else alert("❌ " + res?.error);
     setLoading(false);
   };
 
@@ -58,9 +62,29 @@ export default function EmployeeRow({ employee, branches }: { employee: any, bra
     <>
       <tr className="hover:bg-slate-50 transition-colors">
         <td className="p-5 font-bold">{employee.name} <br/><span className="text-xs text-slate-400 font-mono">{employee.code}</span></td>
+        
+        {/* 🔻 تعديل خلية الجهاز 🔻 */}
         <td className="p-5">
-          {employee.deviceId ? <span className="text-[10px] bg-slate-100 p-2 rounded-lg font-mono">{employee.deviceId}</span> : <ActivateDeviceBtn employeeId={employee.id} />}
+          {employee.deviceId ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-slate-100 px-3 py-2 rounded-lg font-bold text-slate-600">
+                📱 جهاز مسجل
+              </span>
+              <button 
+                onClick={handleResetDevice} 
+                disabled={loading}
+                title="فك ارتباط الجهاز (السماح بجهاز جديد)"
+                className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition-all flex items-center justify-center"
+              >
+                <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
+              </button>
+            </div>
+          ) : (
+             <ActivateDeviceBtn employeeId={employee.id} />
+          )}
         </td>
+        {/* 🔺 نهاية تعديل خلية الجهاز 🔺 */}
+
         <td className="p-5">
           {employee.attendances?.length > 0 ? "✅ حضر" : "❌ غائب"}
         </td>
@@ -74,15 +98,15 @@ export default function EmployeeRow({ employee, branches }: { employee: any, bra
         </td>
       </tr>
 
-      {/* نافذة التعديل المنبثقة (Modal) */}
+      {/* ... (باقي كود Modal التعديل الخاص بالموظف بدون أي تغيير) ... */}
       {isEditOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 text-right" dir="rtl">
+            {/* نفس الكود الخاص بالفورم اللي كتبناه في الإجابة السابقة */}
             <div className="bg-slate-50 p-6 border-b flex justify-between items-center">
               <button onClick={() => setIsEditOpen(false)} className="text-slate-400 hover:text-red-500"><X /></button>
               <h2 className="text-xl font-black text-slate-800">تعديل بيانات: {employee.name}</h2>
             </div>
-
             <form action={handleUpdate} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[80vh] overflow-y-auto">
               <input name="name" defaultValue={employee.name} placeholder="اسم الموظف" required className="w-full p-3 bg-slate-50 border rounded-xl" />
               <input name="code" defaultValue={employee.code} placeholder="كود الدخول (مثال: ah100)" required className="w-full p-3 bg-slate-50 border rounded-xl" />
