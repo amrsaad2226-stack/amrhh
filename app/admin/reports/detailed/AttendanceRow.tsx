@@ -67,10 +67,27 @@ export default function AttendanceRow({ record, onRefresh }: { record: any, onRe
         <td className="p-4 text-center font-bold text-blue-600">{formatTime(record.checkIn)}</td>
         <td className="p-4 text-center font-bold text-indigo-600">{formatTime(record.checkOut)}</td>
         <td className="p-4 text-center bg-slate-50 dark:bg-slate-950 text-slate-500">{record.defaultHrs}</td>
-        <td className="p-4 text-center text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">{record.actualHrs}</td>
-        <td className="p-4 text-center text-red-500 bg-red-50/50 dark:bg-red-900/10">{Number(record.deficit) > 0 ? record.deficit : "-"}</td>
-        <td className="p-4 text-center text-green-600 dark:text-green-400 bg-green-50/50 dark:bg-green-900/10">{Number(record.overtime) > 0 ? record.overtime : "-"}</td>
-        <td className="p-4 text-center text-amber-600 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/10 font-black text-base">{record.balance} ج</td>
+        
+        {/* الساعات الفعلية (تراكمية خلال اليوم) */}
+        <td className="p-4 text-center text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10">
+          {record.actualHrs}
+        </td>
+        
+        {/* العجز */}
+        <td className="p-4 text-center text-red-500 bg-red-50/50 dark:bg-red-900/10">
+          {record.deficit}
+        </td>
+
+        {/* الإضافي */}
+        <td className="p-4 text-center text-green-600 dark:text-green-400 bg-green-50/50 dark:bg-green-900/10">
+          {record.overtime}
+        </td>
+
+        {/* الرصيد التراكمي */}
+        <td className="p-4 text-center text-amber-600 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/10 font-black text-base">
+          {record.balance !== "-" ? `${record.balance} ج` : "-"}
+        </td>
+        
         <td className="p-4 flex gap-2 justify-center">
           <button onClick={() => setIsEditOpen(true)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all">
             <Edit size={16} />
