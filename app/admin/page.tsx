@@ -1,12 +1,13 @@
-
-import Link from "next/link"; // 👈 أضفنا هذا
+// app/admin/page.tsx
+import Link from "next/link"; 
 import db from "@/lib/db";
-import { Users, MapPin, Clock, CheckCircle, CalendarDays, Building2, FileSpreadsheet, ListOrdered } from "lucide-react"; // 👈 أضفنا 3 أيقونات في الآخر
+import { Users, MapPin, Clock, CheckCircle, CalendarDays, Building2, FileSpreadsheet, ListOrdered } from "lucide-react"; 
 import AddEmployeeForm from "./AddEmployeeForm";
-import ActivateDeviceBtn from "./ActivateDeviceBtn";
 import LeaveActionButtons from "./LeaveActionButtons";
+import EmployeeRow from "./EmployeeRow"; // 👈 استيراد المكون الجديد
 
 export default async function AdminDashboard() {
+  
   const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Africa/Cairo"}));
   today.setHours(0, 0, 0, 0);
 
@@ -143,6 +144,7 @@ export default async function AdminDashboard() {
            </div>
         </div>
 
+        {/* 🔻 تعديل قسم جدول الموظفين فقط 🔻 */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
            <table className="w-full text-right">
               <thead className="bg-slate-50 text-slate-500 text-sm">
@@ -150,23 +152,18 @@ export default async function AdminDashboard() {
                     <th className="p-5">الموظف</th>
                     <th className="p-5">الجهاز</th>
                     <th className="p-5">الحالة اليوم</th>
+                    <th className="p-5">الإجراءات</th> {/* 👈 عمود جديد للإجراءات */}
                  </tr>
               </thead>
               <tbody className="divide-y">
                  {employees.map(emp => (
-                    <tr key={emp.id}>
-                       <td className="p-5 font-bold">{emp.name}</td>
-                       <td className="p-5">
-                          {emp.deviceId ? <span className="text-[10px] bg-slate-100 p-2 rounded-lg font-mono">{emp.deviceId}</span> : <ActivateDeviceBtn employeeId={emp.id} />}
-                       </td>
-                       <td className="p-5">
-                          {emp.attendances.length > 0 ? "✅ حضر" : "❌ غائب"}
-                       </td>
-                    </tr>
+                    // 👈 استخدام المكون الجديد بدلاً من <tr> العادي
+                    <EmployeeRow key={emp.id} employee={emp} branches={branches} />
                  ))}
               </tbody>
            </table>
         </div>
+
       </div>
     </div>
   );

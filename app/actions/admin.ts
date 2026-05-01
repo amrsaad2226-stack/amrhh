@@ -1,4 +1,3 @@
-
 // app/actions/admin.ts
 "use server";
 
@@ -122,12 +121,6 @@ export async function activateEmployeeDevice(employeeId: number, deviceId: strin
   }
 }
 
-// 4. حذف موظف
-export async function deleteEmployee(id: number) {
-  await db.employee.delete({ where: { id } });
-  revalidatePath("/admin");
-}
-
 export async function getPayrollData(month: number, year: number) {
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0); 
@@ -183,4 +176,57 @@ export async function getPayrollData(month: number, year: number) {
       netSalary: netSalary > 0 ? netSalary : 0 
     };
   });
+}
+
+// --- دوال الحذف والتعديل للموظفين ---
+
+export async function deleteEmployee(id: number) {
+  try {
+    // التحقق هل الموظف له بصمات أو إجازات سابقة
+    const emp = await db.employee.findUnique({
+      where: { id },
+      include: { attendances: true, leaveRequests: true }
+    });
+
+    if (emp && (emp.attendances.length > 0 || emp.leaveRequests.length > 0)) {
+      return { error: "لا يمكن حذف الموظف لوجود سجلات حضور وإجازات مرتبطة به. (يمكنك إيقافه بدلاً من حذفه)" };
+    }
+
+    await db.employee.delete({ where: { id } });
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء حذف الموظف" };
+  }
+}
+
+export async function updateEmployee(id: number, data: any) {
+  try {
+    const isAnyBranch = data.branchType === "OPEN";
+    
+    await db.employee.update({
+      where: { id },
+      data: {
+        name: data.name,
+        code: data.code,
+        password: data.password !== "" ? data.password : undefined, // تحديث الباسورد فقط لو تم كتابة جديد
+        department: data.department,
+        isAnyBranch: isAnyBranch,
+        branchId: isAnyBranch ? null : parseInt(data.branchId),
+        timeIn: data.timeIn,
+        timeOut: data.timeOut,
+        dailyHours: parseInt(data.dailyHours),
+        offDay: data.offDay,
+        offDayHours: parseInt(data.offDayHours),
+        salaryType: data.salaryType,
+        dailySalary: parseFloat(data.dailySalary),
+        overtimeRate: parseFloat(data.overtimeRate),
+      }
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء تعديل بيانات الموظف" };
+  }
 }
