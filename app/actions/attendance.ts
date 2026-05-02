@@ -1,170 +1,250 @@
 "use server";
 import db from "@/lib/db";
+import { getDistance } from "@/lib/location";
 import { revalidatePath } from "next/cache";
 
-export async function punchIn(employeeCode: string) {
+const getCurrentCairoTime = () => {
+  const now = new Date();
+  // We will store the date as is (in UTC). The database and server will handle it as UTC.
+  // The frontend will display it based on user's browser timezone, which is what we reverted to.
+  // This is the simplest and most robust approach.
+  return now;
+};
+
+export async function checkInAction(code: string, lat: number, lng: number, deviceId: string) {
   try {
     const employee = await db.employee.findUnique({
-      where: { code: employeeCode },
+      where: { code },
+      include: { branch: true }
     });
 
-    if (!employee) {
-      throw new Error("Employee not found");
+    if (!employee) return { error: "كود الموظف غير صحيح" };
+    if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
+    
+    if (employee.deviceId?.trim() !== deviceId?.trim()) {
+      return { error: `عذراً، البصمة غير متطابقة. سجل دخول مجدداً.` };
     }
 
-    const today = new Date();
+    let isNearAnyAllowedBranch = false;
+    let distanceMsg = "";
+    if (employee.isAnyBranch) {
+      const allBranches = await db.branch.findMany();
+      if (allBranches.length === 0) return { error: "لا يوجد فروع مسجلة في النظام" };
+      for (const b of allBranches) {
+        const dist = getDistance(lat, lng, b.latitude, b.longitude);
+        if (dist <= (employee.allowDist || 50)) {
+          isNearAnyAllowedBranch = true;
+          break;
+        }
+      }
+    } else if (employee.branch) {
+      const dist = getDistance(lat, lng, employee.branch.latitude, employee.branch.longitude);
+      distanceMsg = `(المسافة: ${Math.round(dist)} متر)`;
+      if (dist <= (employee.allowDist || 50)) {
+        isNearAnyAllowedBranch = true;
+      }
+    } else {
+      return { error: "لم يتم ربط هذا الموظف بأي فرع في الإعدادات" };
+    }
+
+    if (!isNearAnyAllowedBranch) {
+      return { error: `أنت خارج النطاق الجغرافي للعمل ${distanceMsg}` };
+    }
+
+    const activeSession = await db.attendance.findFirst({
+      where: { 
+        employeeId: employee.id, 
+        checkOut: null 
+      }
+    });
+
+    if (activeSession) {
+      return { error: "أنت مسجل حضور بالفعل! يجب تسجيل الانصراف أولاً." };
+    }
+
+    const now = getCurrentCairoTime();
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
-
-    const existingAttendance = await db.attendance.findFirst({
-      where: {
-        employeeId: employee.id,
-        checkOut: null,
-      },
-    });
-
-    if (existingAttendance) {
-      throw new Error("Employee already checked in");
-    }
 
     await db.attendance.create({
       data: {
         employeeId: employee.id,
-        checkIn: new Date(),
         date: today,
+        checkIn: now,
+        latIn: lat,
+        lngIn: lng,
+        requiredHours: employee.dailyHours || 8, 
+        status: "Present",
       },
     });
-
+    
     revalidatePath("/portal");
-    revalidatePath("/admin/dashboard");
-    return { success: true, message: "تم تسجيل الحضور بنجاح" };
+    revalidatePath("/admin");
+
+    return { success: "تم تسجيل الدخول بنجاح ✅" };
+
   } catch (error: any) {
-    return { success: false, message: error.message };
+    console.error("Check-in Error:", error);
+    return { error: `خطأ تقني: ${error.message}` };
   }
 }
 
-export async function punchOut(employeeCode: string) {
+export async function checkOutAction(code: string, lat: number, lng: number, deviceId: string) {
   try {
     const employee = await db.employee.findUnique({
-      where: { code: employeeCode },
+      where: { code },
+      include: { branch: true }
     });
 
-    if (!employee) {
-      throw new Error("Employee not found");
-    }
+    if (!employee) return { error: "كود الموظف غير صحيح" };
+    if (!employee.deviceId) return { error: "حسابك غير مفعل بعد. أرسل بصمة جهازك للمدير." };
 
-    const attendance = await db.attendance.findFirst({
-      where: {
-        employeeId: employee.id,
-        checkOut: null,
+    if (employee.deviceId?.trim() !== deviceId?.trim()) {
+      return { error: `عذراً، البصمة غير متطابقة. سجل دخول مجدداً.` };
+    }
+    
+    let isNearAnyAllowedBranch = false;
+    if (employee.isAnyBranch) {
+      const allBranches = await db.branch.findMany();
+      for (const b of allBranches) {
+        if (getDistance(lat, lng, b.latitude, b.longitude) <= (employee.allowDist || 50)) {
+          isNearAnyAllowedBranch = true; break;
+        }
+      }
+    } else if (employee.branch) {
+      if (getDistance(lat, lng, employee.branch.latitude, employee.branch.longitude) <= (employee.allowDist || 50)) {
+        isNearAnyAllowedBranch = true;
+      }
+    }
+    if (!isNearAnyAllowedBranch) return { error: "أنت خارج نطاق الفرع! لا يمكنك تسجيل الانصراف من هنا." };
+
+    const lastSession = await db.attendance.findFirst({
+      where: { 
+        employeeId: employee.id, 
+        checkOut: null 
       },
+      orderBy: { checkIn: 'desc' }
     });
 
-    if (!attendance || !attendance.checkIn) { // FIXED: Added check for checkIn
-      throw new Error("لا يوجد سجل حضور مفتوح للإنصراف.");
-    }
+    if (!lastSession) return { error: "لا يوجد سجل حضور مفتوح حالياً." };
 
-    const checkOutTime = new Date();
-    const duration =
-      (checkOutTime.getTime() - attendance.checkIn.getTime()) / (1000 * 60 * 60);
+    const now = getCurrentCairoTime();
+    const checkInTime = new Date(lastSession.checkIn!);
+    const diffInMs = now.getTime() - checkInTime.getTime();
+    const durationHours = diffInMs / (1000 * 60 * 60);
+
+    // New Logic: Validate session duration
+    const dailyHours = employee.dailyHours || 8; // Default to 8 hours if not set
+    const maxDuration = dailyHours * 2; // Maximum duration is twice the daily hours
+
+    if (durationHours > maxDuration) {
+      return { 
+        error: `مدة العمل (${durationHours.toFixed(1)} ساعة) تجاوزت الحد الأقصى (${maxDuration} ساعة). غالباً نسيت تسجيل الانصراف. يرجى مراجعة المدير لتصحيح السجل.` 
+      };
+    }
 
     await db.attendance.update({
-      where: {
-        id: attendance.id,
-      },
+      where: { id: lastSession.id },
       data: {
-        checkOut: checkOutTime,
-        duration: parseFloat(duration.toFixed(2)),
-      },
+        checkOut: now,
+        latOut: lat,
+        lngOut: lng,
+        duration: parseFloat(durationHours.toFixed(2)),
+      }
     });
-
+    
     revalidatePath("/portal");
-    revalidatePath("/admin/dashboard");
-    return { success: true, message: "تم تسجيل الانصراف بنجاح" };
+    revalidatePath("/admin");
+
+    return { success: `تم تسجيل الانصراف بنجاح ✅` };
   } catch (error: any) {
-    return { success: false, message: error.message };
+     console.error("Checkout Error:", error);
+     return { error: `خطأ تقني: ${error.message}` };
   }
 }
 
-export async function getEmployeePortalAttendance(employeeId: number, startDate: Date, endDate: Date) {
-  const employee = await db.employee.findUnique({ where: { id: employeeId }});
-  if (!employee) throw new Error("Employee not found");
+export async function getEmployeePortalAttendance(empId: number) {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const attendance = await db.attendance.findMany({
+  const records = await db.attendance.findMany({
     where: {
-      employeeId: employeeId,
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
+      employeeId: empId,
+      date: { gte: sevenDaysAgo },
     },
-    orderBy: [ { date: 'asc' }, { checkIn: 'asc' }],
+    include: { employee: true },
+    orderBy: [{ date: "asc" }, { checkIn: "asc" }],
   });
 
-  const hourlyRate = employee.dailySalary > 0 && employee.dailyHours > 0
-    ? employee.dailySalary / employee.dailyHours
-    : 0;
+  const dailyTotals: Record<string, number> = {};
+  records.forEach((r) => {
+    const dateStr = r.date.toISOString().split("T")[0];
+    const key = `${r.employeeId}_${dateStr}`;
+    if (!dailyTotals[key]) dailyTotals[key] = 0;
 
-  const finalProcessedRecords: any[] = [];
-  const newDailyTotals: { [key: string]: { duration: number, balance: number, overtime: string, deficit: string } } = {};
-
-  // First, calculate all daily totals
-  attendance.forEach(current => {
-    const dateStr = current.date.toISOString().split('T')[0];
-    if (!newDailyTotals[dateStr]) {
-      newDailyTotals[dateStr] = { duration: 0, balance: 0, overtime: '-', deficit: '-' };
+    let hrs = 0;
+    if (r.checkIn && r.checkOut) {
+      hrs = (r.checkOut.getTime() - r.checkIn.getTime()) / (1000 * 60 * 60);
+      if (hrs < 0) hrs += 24;
     }
-    let duration = 0;
-    if (current.checkOut) {
-      duration = current.duration || 0;
-    } else if (current.checkIn) { // FIXED: Added check for checkIn
-      duration = (new Date().getTime() - current.checkIn.getTime()) / (1000 * 60 * 60);
-    }
-    newDailyTotals[dateStr].duration += duration;
+    dailyTotals[key] += hrs;
   });
 
-  // Calculate balance, overtime, deficit for each day
-  for (const dateStr in newDailyTotals) {
-    const dayTotalHours = newDailyTotals[dateStr].duration;
-    const targetHours = employee.dailyHours;
-    const diff = dayTotalHours - targetHours;
-    newDailyTotals[dateStr].balance = diff * hourlyRate;
-    if (diff > 0) {
-      newDailyTotals[dateStr].overtime = diff.toFixed(2) + 'h';
-    } else if (diff < 0) {
-      newDailyTotals[dateStr].deficit = Math.abs(diff).toFixed(2) + 'h';
-    }
-  }
+  let cumulativeBalance = 0;
+  let currentDayStr = "";
+  let accumulatedDayHours = 0;
 
-  // Now, construct the records with cumulative daily hours and final daily totals
-  const cumulativeDailyHours: { [key: string]: number } = {};
-  for (let i = 0; i < attendance.length; i++) {
-    const current = attendance[i];
-    const dateStr = current.date.toISOString().split('T')[0];
+  return records.map((record, index) => {
+    const dateStr = record.date.toISOString().split("T")[0];
 
-    if (!cumulativeDailyHours[dateStr]) {
-      cumulativeDailyHours[dateStr] = 0;
+    if (currentDayStr !== dateStr) {
+      currentDayStr = dateStr;
+      accumulatedDayHours = 0;
     }
 
-    let duration = 0;
-    if (current.checkOut) {
-      duration = current.duration || 0;
-    } else if (current.checkIn) { // FIXED: Added check for checkIn
-      duration = (new Date().getTime() - current.checkIn.getTime()) / (1000 * 60 * 60);
+    const empDailyHours = record.employee.dailyHours || 8;
+    const empDailySalary = record.employee.dailySalary || 0;
+    const hourlyRate = empDailyHours > 0 ? empDailySalary / empDailyHours : 0;
+
+    let sessionHours = 0;
+    if (record.checkIn && record.checkOut) {
+      sessionHours = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
+      if (sessionHours < 0) sessionHours += 24;
     }
-    cumulativeDailyHours[dateStr] += duration;
 
-    const next = attendance[i + 1];
-    const isLastOfDay = !next || next.date.toISOString().split('T')[0] !== dateStr;
+    accumulatedDayHours += sessionHours;
 
-    finalProcessedRecords.push({
-      ...current,
-      actualHrs: cumulativeDailyHours[dateStr].toFixed(2) + 'h',
-      balance: isLastOfDay ? newDailyTotals[dateStr].balance.toFixed(2) : '-',
-      overtime: isLastOfDay ? newDailyTotals[dateStr].overtime : '-',
-      deficit: isLastOfDay ? newDailyTotals[dateStr].deficit : '-',
-      isLastOfDay: isLastOfDay,
-    });
-  }
+    const isLastOfDay =
+      index === records.length - 1 ||
+      records[index + 1].date.toISOString().split("T")[0] !== dateStr;
 
-  return finalProcessedRecords;
+    let deficit = "-";
+    let overtime = "-";
+    let displayBalance = "-";
+
+    if (isLastOfDay && record.checkOut) {
+      const totalDayHrs = dailyTotals[`${record.employeeId}_${dateStr}`];
+      const def = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
+      const ovt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
+
+      deficit = def > 0 ? def.toFixed(2) : "-";
+      overtime = ovt > 0 ? ovt.toFixed(2) : "-";
+
+      const dailyEarned = totalDayHrs * hourlyRate;
+      cumulativeBalance += dailyEarned;
+      displayBalance = Math.round(cumulativeBalance).toString();
+    } else if (!record.checkOut) {
+      // This is an open session
+      deficit = "مفتوح";
+    }
+
+    return {
+      ...record,
+      actualHrs: accumulatedDayHours > 0 ? accumulatedDayHours.toFixed(2) : (record.checkOut ? "0.00" : "-"),
+      deficit,
+      overtime,
+      balance: displayBalance,
+      isLastOfDay: isLastOfDay
+    };
+  });
 }
