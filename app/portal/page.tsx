@@ -75,22 +75,36 @@ export default async function EmployeePortal() {
       break;
   }
 
-  const stats = await db.attendance.aggregate({
-    _sum: {
-      duration: true,
-    },
+  // استدعاء جميع السجلات لفترة الراتب الحالية (سواء مغلقة أو مفتوحة)
+  const periodRecords = await db.attendance.findMany({
     where: {
       employeeId: employee.id,
       date: {
         gte: startDate,
         lte: endDate,
       },
-      checkOut: { not: null } 
     }
   });
 
-  const totalHoursWorked = stats._sum.duration || 0;
-  const hourlyRate = employee.dailySalary > 0 && employee.dailyHours > 0 ? employee.dailySalary / employee.dailyHours : 0;
+  let totalHoursWorked = 0;
+  const rightNow = new Date(); // الوقت الحالي لحظة فتح الصفحة
+
+  periodRecords.forEach(record => {
+    if (record.checkIn && record.checkOut) {
+      // 1. حساب الجلسات المكتملة
+      const hrs = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
+      totalHoursWorked += Math.max(0, hrs);
+    } else if (record.checkIn && !record.checkOut) {
+      // 2. حساب الجلسة المفتوحة (الحالية) بشكل لحظي !
+      const hrs = (rightNow.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
+      totalHoursWorked += Math.max(0, hrs);
+    }
+  });
+
+  const hourlyRate = employee.dailySalary > 0 && employee.dailyHours > 0 
+    ? employee.dailySalary / employee.dailyHours 
+    : 0;
+    
   const currentTotalSalary = totalHoursWorked * hourlyRate;
 
   return (
