@@ -1,4 +1,3 @@
-// app/portal/page.tsx
 import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -26,23 +25,17 @@ export default async function EmployeePortal() {
 
   if (!employee) redirect("/login");
 
-  const processedAttendance = await getEmployeePortalAttendance(empId);
-
-  const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
-  const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
-
-  // --- DYNAMIC SALARY CALCULATION LOGIC ---
+  // --- تحديد فترة الراتب أولاً بناءً على نوع الموظف ---
   const now = new Date();
   let startDate: Date;
   let endDate: Date;
   let targetHours: number;
   let periodLabel: string;
 
-  // Helper function to get the start of the week (assuming Saturday is the first day)
   const getStartOfWeek = (d: Date) => {
     const date = new Date(d);
-    const day = date.getDay(); // Sunday: 0, ..., Saturday: 6
-    const diff = (day + 1) % 7; // Difference to get back to Saturday
+    const day = date.getDay(); 
+    const diff = (day + 1) % 7; 
     date.setDate(date.getDate() - diff);
     date.setHours(0, 0, 0, 0);
     return date;
@@ -70,42 +63,45 @@ export default async function EmployeePortal() {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
-      targetHours = (employee.dailyHours || 8) * 26; // Assuming 26 working days
+      targetHours = (employee.dailyHours || 8) * 26; 
       periodLabel = "الشهر";
       break;
   }
 
-  // استدعاء جميع السجلات لفترة الراتب الحالية (سواء مغلقة أو مفتوحة)
-  const periodRecords = await db.attendance.findMany({
-    where: {
-      employeeId: employee.id,
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
-    }
-  });
+  // تمرير تواريخ فترة الراتب كاملة للحصول على التراكمي الصحيح
+  const processedAttendance = await getEmployeePortalAttendance(empId, startDate, endDate);
 
+  const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
+  const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
+
+  // --- حساب الساعات بشكل لحظي (مغلق + مفتوح) ---
   let totalHoursWorked = 0;
-  const rightNow = new Date(); // الوقت الحالي لحظة فتح الصفحة
+  const rightNow = new Date();
 
-  periodRecords.forEach(record => {
+  processedAttendance.forEach(record => {
     if (record.checkIn && record.checkOut) {
-      // 1. حساب الجلسات المكتملة
       const hrs = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
       totalHoursWorked += Math.max(0, hrs);
     } else if (record.checkIn && !record.checkOut) {
-      // 2. حساب الجلسة المفتوحة (الحالية) بشكل لحظي !
       const hrs = (rightNow.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
       totalHoursWorked += Math.max(0, hrs);
     }
   });
 
-  const hourlyRate = employee.dailySalary > 0 && employee.dailyHours > 0 
-    ? employee.dailySalary / employee.dailyHours 
-    : 0;
-    
-  const currentTotalSalary = totalHoursWorked * hourlyRate;
+  // --- جلب الراتب من آخر "صافي" تم حسابه للفترة ---
+  let currentTotalSalary = 0;
+  const lastRecordWithBalance = [...processedAttendance].reverse().find(
+    r => r.balance && r.balance !== "-" && r.balance !== "مفتوح"
+  );
+
+  if (lastRecordWithBalance) {
+    currentTotalSalary = parseFloat(lastRecordWithBalance.balance) || 0;
+  }
+
+  // --- تصفية السجلات للعرض (آخر 7 أيام فقط لتخفيف الواجهة) ---
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const displayAttendanceRecords = processedAttendance.filter(r => new Date(r.date) >= sevenDaysAgo);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
@@ -129,7 +125,7 @@ export default async function EmployeePortal() {
         <PortalView 
           employee={employee} 
           isCurrentlyIn={isCurrentlyIn}
-          attendanceRecords={processedAttendance}
+          attendanceRecords={displayAttendanceRecords} // تمرير آخر 7 أيام فقط للعرض
           totalEarnings={currentTotalSalary} 
           totalHours={totalHoursWorked}
           targetHours={targetHours}
