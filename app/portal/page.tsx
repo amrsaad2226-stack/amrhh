@@ -9,6 +9,16 @@ import ThemeToggle from "../_components/ThemeToggle";
 import PortalView from "./PortalView";
 import { SalaryType } from "@prisma/client";
 
+// Helper function to get the start of the week (assuming Saturday is the first day)
+const getStartOfWeek = (d: Date) => {
+  const date = new Date(d);
+  const day = date.getDay(); // Sunday: 0, ..., Saturday: 6
+  const diff = (day + 1) % 7; // Difference to get back to Saturday
+  date.setDate(date.getDate() - diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
 export default async function EmployeePortal() {
   const cookieStore = await cookies();
   const empIdStr = cookieStore.get("emp_session")?.value;
@@ -26,27 +36,12 @@ export default async function EmployeePortal() {
 
   if (!employee) redirect("/login");
 
-  const processedAttendance = await getEmployeePortalAttendance(empId);
-
-  const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
-  const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
-
-  // --- DYNAMIC SALARY CALCULATION LOGIC ---
+  // --- DYNAMIC PERIOD SETUP ---
   const now = new Date();
   let startDate: Date;
   let endDate: Date;
   let targetHours: number;
   let periodLabel: string;
-
-  // Helper function to get the start of the week (assuming Saturday is the first day)
-  const getStartOfWeek = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getDay(); // Sunday: 0, ..., Saturday: 6
-    const diff = (day + 1) % 7; // Difference to get back to Saturday
-    date.setDate(date.getDate() - diff);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  };
 
   switch (employee.salaryType) {
     case SalaryType.DAILY:
@@ -75,21 +70,37 @@ export default async function EmployeePortal() {
       break;
   }
 
-  const stats = await db.attendance.aggregate({
-    _sum: {
-      duration: true,
-    },
-    where: {
-      employeeId: employee.id,
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
-      checkOut: { not: null } 
-    }
-  });
+  const processedAttendance = await getEmployeePortalAttendance(empId, startDate, endDate);
+  
+  // Calculate total hours from the source of truth
+  let totalHoursWorked = 0;
+  if (processedAttendance.length > 0) {
+    const lastRecord = processedAttendance[processedAttendance.length - 1];
+    // Find the total for its day
+    const dateStr = lastRecord.date.toISOString().split('T')[0];
+    let dayTotal = 0;
+    processedAttendance.forEach(rec => {
+      if (rec.date.toISOString().split('T')[0] === dateStr) {
+         let duration = 0;
+         if(rec.checkOut) {
+            duration = rec.duration || 0;
+         } else {
+            duration = (new Date().getTime() - rec.checkIn.getTime()) / (1000 * 60 * 60);
+         }
+         dayTotal += duration
+      }
+    });
+    // To get the grand total, we sum previous days and add the current day's running total
+    const previousDaysTotal = processedAttendance
+      .filter(p => p.date.toISOString().split('T')[0] !== dateStr)
+      .reduce((acc, curr) => acc + (curr.duration || 0), 0)
 
-  const totalHoursWorked = stats._sum.duration || 0;
+    totalHoursWorked = previousDaysTotal + dayTotal;
+  }
+
+  // Check if the employee is currently punched in
+  const isCurrentlyIn = processedAttendance.some(rec => !rec.checkOut);
+
   const hourlyRate = employee.dailySalary > 0 && employee.dailyHours > 0 ? employee.dailySalary / employee.dailyHours : 0;
   const currentTotalSalary = totalHoursWorked * hourlyRate;
 
