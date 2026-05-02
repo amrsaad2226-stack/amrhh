@@ -3,94 +3,32 @@ import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { logoutEmployee } from "@/app/actions/auth";
+import { getEmployeePortalAttendance } from "@/app/actions/attendance";
 import { LogOut } from "lucide-react";
 import ThemeToggle from "../_components/ThemeToggle";
 import PortalView from "./PortalView";
-import { SalaryType } from "@prisma/client";
 
 export default async function EmployeePortal() {
   const cookieStore = await cookies();
-  const empId = cookieStore.get("emp_session")?.value;
+  const empIdStr = cookieStore.get("emp_session")?.value;
   
-  if (!empId) redirect("/login");
+  if (!empIdStr) redirect("/login");
+
+  const empId = parseInt(empIdStr);
 
   const employee = await db.employee.findUnique({
-    where: { id: parseInt(empId) },
+    where: { id: empId },
     include: { 
-      attendances: { 
-        orderBy: { checkIn: 'desc' }, 
-        take: 7
-      },
       leaveRequests: { orderBy: { createdAt: 'desc' }, take: 5 }
     }
   });
 
   if (!employee) redirect("/login");
 
-  const lastAttendance = employee.attendances && employee.attendances[0];
+  const processedAttendance = await getEmployeePortalAttendance(empId);
+
+  const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
-
-  // --- DYNAMIC SALARY CALCULATION LOGIC ---
-  const now = new Date();
-  let startDate: Date;
-  let endDate: Date;
-  let targetHours: number;
-  let periodLabel: string;
-
-  // Helper function to get the start of the week (assuming Saturday is the first day)
-  const getStartOfWeek = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getDay(); // Sunday: 0, ..., Saturday: 6
-    const diff = (day + 1) % 7; // Difference to get back to Saturday
-    date.setDate(date.getDate() - diff);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  };
-
-  switch (employee.salaryType) {
-    case SalaryType.DAILY:
-      startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
-      targetHours = employee.dailyHours || 8;
-      periodLabel = "اليوم";
-      break;
-    case SalaryType.WEEKLY:
-      startDate = getStartOfWeek(now);
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
-      targetHours = (employee.dailyHours || 8) * (employee.offDay === 'NONE' ? 7 : 6);
-      periodLabel = "الأسبوع";
-      break;
-    case SalaryType.MONTHLY:
-    default:
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      endDate.setHours(23, 59, 59, 999);
-      targetHours = (employee.dailyHours || 8) * 26; // Assuming 26 working days
-      periodLabel = "الشهر";
-      break;
-  }
-
-  const stats = await db.attendance.aggregate({
-    _sum: {
-      duration: true,
-    },
-    where: {
-      employeeId: employee.id,
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
-      checkOut: { not: null } 
-    }
-  });
-
-  const totalHoursWorked = stats._sum.duration || 0;
-  const hourlyRate = employee.dailySalary > 0 && employee.dailyHours > 0 ? employee.dailySalary / employee.dailyHours : 0;
-  const currentTotalSalary = totalHoursWorked * hourlyRate;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
@@ -114,10 +52,7 @@ export default async function EmployeePortal() {
         <PortalView 
           employee={employee} 
           isCurrentlyIn={isCurrentlyIn}
-          totalEarnings={currentTotalSalary} 
-          totalHours={totalHoursWorked}
-          targetHours={targetHours}
-          periodLabel={periodLabel}
+          attendanceRecords={processedAttendance}
         />
         
       </div>

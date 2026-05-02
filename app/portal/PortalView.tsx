@@ -2,25 +2,24 @@
 import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
-import SalaryDashboard from "./_components/SalaryDashboard";
 import { Clock, Calendar, ChevronLeft, History, Download } from "lucide-react";
+
+// Helper to format time
+const formatTime = (dateString: string | null) => {
+  if (!dateString) return "--:--";
+  return new Date(dateString).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+}
 
 interface PortalViewProps {
   employee: any;
   isCurrentlyIn: boolean;
-  totalEarnings: number;
-  totalHours: number;
-  targetHours: number;
-  periodLabel: string;
+  attendanceRecords: any[];
 }
 
 export default function PortalView({ 
   employee, 
   isCurrentlyIn, 
-  totalEarnings, 
-  totalHours, 
-  targetHours, 
-  periodLabel
+  attendanceRecords
 }: PortalViewProps) {
   
   const [deviceId, setDeviceId] = useState<string>("");
@@ -35,33 +34,27 @@ export default function PortalView({
     try {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
-      const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-      // تحميل الخط العربي (Tajawal)
       const tajawalFont = await fetch('/fonts/Tajawal-Regular.ttf').then(res => res.arrayBuffer());
       doc.addFileToVFS('Tajawal-Regular.ttf', btoa(String.fromCharCode(...new Uint8Array(tajawalFont))));
       doc.addFont('Tajawal-Regular.ttf', 'Tajawal', 'normal');
       doc.setFont('Tajawal');
 
-      const tableColumn = ["تاريخ", "حضور", "انصراف", "س. فعلية", "اضافي/عجز", "صافي"];
+      doc.text(`سجل حضور الموظف: ${employee.name}`, 105, 15, { align: 'center' });
+
+      const tableColumn = ["الصافي", "الإضافي", "العجز", "ف. تراكمي", "انصراف", "حضور", "تاريخ"];
       const tableRows: any[][] = [];
 
-      employee.attendances?.forEach((record: any) => {
-        const requiredHours = employee.dailyHours || 8;
-        const difference = record.checkOut ? record.duration - requiredHours : 0;
-        const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0)
-          ? employee.dailySalary / employee.dailyHours
-          : 0;
-        const netDailyEarning = record.duration * hourlyRate;
+      attendanceRecords.reverse().forEach((record: any) => {
         const rowData = [
-          new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }),
-          new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-          record.checkOut
-            ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
-            : '--:--',
-          record.duration.toFixed(2),
-          difference.toFixed(2),
-          netDailyEarning.toFixed(2) + ' ج'
+          record.isLastOfDay && record.balance !== "-" ? `${record.balance} ج` : '-',
+          record.isLastOfDay ? record.overtime : '-',
+          record.isLastOfDay ? record.deficit : '-',
+          record.actualHrs,
+          formatTime(record.checkOut),
+          formatTime(record.checkIn),
+          new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }),
         ];
         tableRows.push(rowData);
       });
@@ -69,13 +62,11 @@ export default function PortalView({
       autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
-        startY: 10,
+        startY: 25,
         theme: 'grid',
         styles: {
-          fontSize: 9,
-          cellPadding: 2,
-          font: 'Tajawal', // استخدام الخط العربي
-          halign: 'right' // المحاذاة لليمين
+          font: 'Tajawal', 
+          halign: 'right'
         },
         headStyles: {
           fillColor: [59, 130, 246],
@@ -121,13 +112,6 @@ export default function PortalView({
   return (
     <div className="space-y-8 pb-10">
       
-      <SalaryDashboard 
-        totalEarnings={totalEarnings} 
-        totalHours={totalHours}
-        targetHours={targetHours}
-        periodLabel={periodLabel}
-      />
-
       <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
 
       <div className="pt-4">
@@ -150,17 +134,9 @@ export default function PortalView({
           </div>
         </div>
 
-        {employee.attendances && employee.attendances.length > 0 ? (
+        {attendanceRecords && attendanceRecords.length > 0 ? (
           <div className="relative space-y-6 before:absolute before:inset-0 before:mr-5 before:-ml-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-500 before:to-transparent before:opacity-20">
-            {employee.attendances.map((record: any) => {
-              const requiredHours = employee.dailyHours || 8;
-              const difference = record.checkOut ? record.duration - requiredHours : 0;
-              const hourlyRate = (employee.dailySalary > 0 && employee.dailyHours > 0) 
-                ? employee.dailySalary / employee.dailyHours 
-                : 0;
-              const netDailyEarning = record.duration * hourlyRate;
-
-              return (
+            {[...attendanceRecords].reverse().map((record: any) => (
                 <div key={record.id} className="relative flex gap-4 group">
                   <div className="absolute right-0 translate-x-1/2 mt-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow-sm z-10 dark:border-slate-900"></div>
 
@@ -186,53 +162,50 @@ export default function PortalView({
                     <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
                       <div className="flex items-center gap-1.5">
                          <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                         {new Date(record.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                         {formatTime(record.checkIn)}
                       </div>
                       <ChevronLeft size={14} className="text-slate-300" />
                       <div className="flex items-center gap-1.5">
                          <div className={`w-1.5 h-1.5 rounded-full ${record.checkOut ? 'bg-red-500' : 'bg-slate-300'}`}></div>
-                         {record.checkOut 
-                           ? new Date(record.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) 
-                           : '--:--'}
+                         {formatTime(record.checkOut)}
                       </div>
                     </div>
                     
-                    {record.duration > 0 && (
-                      <div className="mt-4 grid grid-cols-3 gap-x-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+                    {(record.checkOut || record.actualHrs !== '-') && (
+                      <div className="mt-4 grid grid-cols-4 gap-x-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+                        
                         <div className="text-center">
-                          <span className="text-xs font-bold text-slate-400 block">س. فعلية</span>
+                          <span className="text-xs font-bold text-slate-400 block">ف. تراكمي</span>
                           <span className="text-sm font-black text-blue-600 dark:text-blue-400 mt-1 block">
-                            {record.duration.toFixed(2)}
+                            {record.actualHrs}
                           </span>
                         </div>
                         
                         <div className="text-center">
-                          <span className={`text-xs font-bold block ${
-                            !record.checkOut || difference === 0 ? 'text-slate-400' : 
-                            difference > 0 ? 'text-green-500' : 'text-red-500'
-                          }`}>
-                            {record.checkOut && difference !== 0 ? (difference > 0 ? 'إضافي' : 'عجز') : '---'}
-                          </span>
-                          <span className={`text-sm font-black mt-1 block ${
-                            !record.checkOut || difference === 0 ? 'text-slate-400' : 
-                            difference > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                          }`}>
-                            {record.checkOut && difference !== 0 ? Math.abs(difference).toFixed(2) : '-'}
-                          </span>
+                           <span className="text-xs font-bold text-slate-400 block">عجز</span>
+                           <span className={`text-sm font-black mt-1 block ${record.deficit !== '-' ? 'text-red-500' : 'text-slate-400'}`}>
+                              {record.isLastOfDay ? record.deficit : '-'}
+                           </span>
                         </div>
 
                         <div className="text-center">
-                          <span className="text-xs font-bold text-slate-400 block">الصافي</span>
-                          <span className="text-sm font-black text-slate-700 dark:text-slate-200 mt-1 block">
-                            {netDailyEarning.toFixed(2)} ج
+                           <span className="text-xs font-bold text-slate-400 block">إضافي</span>
+                           <span className={`text-sm font-black mt-1 block ${record.overtime !== '-' ? 'text-green-600' : 'text-slate-400'}`}>
+                              {record.isLastOfDay ? record.overtime : '-'}
+                           </span>
+                        </div>
+
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">صافي</span>
+                          <span className="text-sm font-black text-amber-600 dark:text-amber-400 mt-1 block">
+                            {record.isLastOfDay && record.balance !== '-' ? `${record.balance} ج` : '-'}
                           </span>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
         ) : (
           <div className="text-center py-10 px-6 bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
