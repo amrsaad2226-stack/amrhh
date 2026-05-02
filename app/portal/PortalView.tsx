@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
+import SalaryDashboard from "./_components/SalaryDashboard";
 import { Clock, Calendar, ChevronLeft, History, Download } from "lucide-react";
 
 // Helper to format time
@@ -14,12 +15,20 @@ interface PortalViewProps {
   employee: any;
   isCurrentlyIn: boolean;
   attendanceRecords: any[];
+  totalEarnings: number;
+  totalHours: number;
+  targetHours: number;
+  periodLabel: string;
 }
 
 export default function PortalView({ 
   employee, 
   isCurrentlyIn, 
-  attendanceRecords
+  attendanceRecords,
+  totalEarnings,
+  totalHours,
+  targetHours,
+  periodLabel
 }: PortalViewProps) {
   
   const [deviceId, setDeviceId] = useState<string>("");
@@ -112,6 +121,13 @@ export default function PortalView({
   return (
     <div className="space-y-8 pb-10">
       
+      <SalaryDashboard 
+        totalEarnings={totalEarnings} 
+        totalHours={totalHours}
+        targetHours={targetHours}
+        periodLabel={periodLabel}
+      />
+
       <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
 
       <div className="pt-4">
