@@ -47,6 +47,7 @@ model Employee {
   createdAt        DateTime @default(now())
   attendances      Attendance[]
   leaveRequests    LeaveRequest[]
+  cashTransactions CashTransaction[]
 }
 
 model Attendance {
@@ -93,4 +94,21 @@ model LeaveRequest {
   reason       String?
   status       String   @default("Pending")
   createdAt    DateTime @default(now())
+}
+
+model CashTransaction {
+  id          Int      @id @default(autoincrement())
+  type        CashType
+  amount      Float
+  note        String?
+
+  employeeId  Int?
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+
+  createdAt   DateTime @default(now())
+}
+
+enum CashType {
+  INCOME
+  OUTCOME
 }
