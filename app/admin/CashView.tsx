@@ -30,7 +30,7 @@ export default function CashView({ transactions, employees }: CashViewProps) {
     }
     setIsLoading(false);
     // This is a simple way to reset the form. A more robust solution might be needed.
-    const form = document.querySelector('form'); // Consider more specific selectors
+    const form = document.getElementById('add-loan-form') as HTMLFormElement;
     form?.reset();
   };
 
@@ -48,7 +48,7 @@ export default function CashView({ transactions, employees }: CashViewProps) {
           <p className="text-2xl font-black text-green-800">{totalIncome.toFixed(2)} ر.س</p>
         </div>
         <div className="bg-red-50 p-4 rounded-2xl">
-          <p className="text-sm text-red-600 font-bold">الإجمالي الخارج (مصروفات + سلف)</p>
+          <p className="text-sm text-red-600 font-bold">الإجمالي الخارج (سلف)</p>
           <p className="text-2xl font-black text-red-800">{totalOutcome.toFixed(2)} ر.س</p>
         </div>
         <div className="bg-blue-50 p-4 rounded-2xl">
@@ -60,9 +60,9 @@ export default function CashView({ transactions, employees }: CashViewProps) {
       </div>
 
       {/* Action Forms */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+      <div className="max-w-lg mx-auto mb-8">
         {/* Add Loan (Advance) Form */}
-        <form action={handleFormSubmit} className="bg-slate-50 p-6 rounded-2xl border">
+        <form id="add-loan-form" action={handleFormSubmit} className="bg-slate-50 p-6 rounded-2xl border">
           <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><PlusCircle size={20} /> إضافة سلفة لموظف</h3>
           <input type="hidden" name="type" value="OUTCOME" />
           <div className="space-y-4">
@@ -83,27 +83,6 @@ export default function CashView({ transactions, employees }: CashViewProps) {
             </div>
             <button type="submit" disabled={isLoading} className="w-full bg-blue-600 text-white font-bold p-3 rounded-lg hover:bg-blue-700 transition disabled:bg-slate-400">
               {isLoading ? 'جاري الحفظ...' : 'حفظ السلفة'}
-            </button>
-          </div>
-        </form>
-
-        {/* Add Expense Form */}
-        <form action={handleFormSubmit} className="bg-slate-50 p-6 rounded-2xl border">
-          <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><PlusCircle size={20} /> إضافة مصروف عام</h3>
-          <input type="hidden" name="type" value="OUTCOME" />
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="expense-amount" className="block text-sm font-bold text-slate-600 mb-1">المبلغ</label>
-              <input type="number" id="expense-amount" name="amount" required step="0.01" className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-500 transition" />
-            </div>
-            <div>
-              <label htmlFor="expense-note" className="block text-sm font-bold text-slate-600 mb-1">بيان المصروف</label>
-              <input type="text" id="expense-note" name="note" required className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-500 transition" />
-            </div>
-             {/* A hidden field to indicate no employee is associated */}
-            <input type="hidden" name="isGeneralExpense" value="true" />
-            <button type="submit" disabled={isLoading} className="w-full bg-yellow-600 text-white font-bold p-3 rounded-lg hover:bg-yellow-700 transition disabled:bg-slate-400">
-              {isLoading ? 'جاري الحفظ...' : 'حفظ المصروف'}
             </button>
           </div>
         </form>
