@@ -97,3 +97,49 @@ export async function deleteCashTransaction(transactionId: number) {
     return { error: "حدث خطأ أثناء حذف الحركة." };
   }
 }
+
+/**
+ * Updates a cash transaction.
+ */
+export async function updateCashTransaction(formData: FormData) {
+  try {
+    // --- 1. Get Data ---
+    const idStr = formData.get("id") as string;
+    const amountStr = formData.get("amount") as string;
+    const note = formData.get("note") as string | null;
+
+    // --- 2. Validation ---
+    const id = parseInt(idStr);
+    if (isNaN(id)) {
+        return { error: "معرف الحركة غير صالح." };
+    }
+
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      return { error: "المبلغ يجب أن يكون رقماً وأكبر من صفر." };
+    }
+
+    if (!note || note.trim() === "") {
+        return { error: "يجب كتابة بيان للحركة (ملاحظات)." };
+    }
+
+    // --- 3. Database Operation ---
+    await db.cashTransaction.update({
+        where: { id },
+        data: {
+            amount,
+            note,
+        },
+    });
+
+    // --- 4. Revalidation ---
+    revalidatePath("/admin/cash");
+    revalidatePath("/admin");
+
+    return { success: true };
+
+  } catch (err) {
+    console.error(err);
+    return { error: "حدث خطأ غير متوقع أثناء تحديث الحركة. الرجاء المحاولة مرة أخرى." };
+  }
+}
