@@ -1,25 +1,35 @@
-"use client";
-import { useState } from "react";
-import { Lock } from "lucide-react";
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Lock } from 'lucide-react';
+import { login } from '@/app/actions/auth'; // Import the server action
 
 export default function AdminLoginPage() {
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // We will use a professional way to store the session in cookies
-    if (password === "saad101") { // We will convert this to a Server Action later for security
-       document.cookie = `admin_session=authenticated; path=/; max-age=3600`;
-       window.location.href = "/admin";
+  async function handleLogin(formData: FormData) {
+    setLoading(true);
+    setError(null);
+
+    const result = await login(formData);
+
+    if (result?.error) {
+      setError(result.error);
+      setLoading(false);
     } else {
-      setError("Incorrect password ❌");
+      // On successful login, the server action sets the cookie.
+      // We just need to redirect the user.
+      // Using router.replace to avoid adding the login page to the history stack.
+      router.replace('/admin');
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans" dir="rtl">
-      <form onSubmit={handleLogin} className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md text-center">
+      <form action={handleLogin} className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md text-center">
         <div className="bg-blue-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6">
           <Lock className="text-blue-600" size={32} />
         </div>
@@ -28,15 +38,20 @@ export default function AdminLoginPage() {
         
         <input
           type="password"
+          name="password" // The 'name' attribute is crucial for FormData
           placeholder="Password"
+          required
           className="w-full p-4 border-2 border-slate-100 rounded-2xl text-center mb-4 focus:border-blue-500 outline-none transition-all"
-          onChange={(e) => setPassword(e.target.value)}
         />
         
         {error && <p className="text-red-500 text-xs mb-4 font-bold">{error}</p>}
 
-        <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all">
-          Login
+        <button 
+          type="submit"
+          disabled={loading}
+          className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Verifying...' : 'Login'}
         </button>
       </form>
     </div>
