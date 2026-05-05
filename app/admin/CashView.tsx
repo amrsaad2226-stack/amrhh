@@ -3,9 +3,9 @@
 "use client";
 
 import { useState } from 'react';
-import { DollarSign, PlusCircle } from 'lucide-react';
+import { DollarSign, PlusCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { CashTransaction, Employee } from '@prisma/client';
-import { addCashTransaction } from './actions/cash'; 
+import { addCashTransaction } from './actions/cash';
 
 interface CashViewProps {
   transactions: (CashTransaction & { employee: Employee | null })[];
@@ -15,6 +15,8 @@ interface CashViewProps {
 export default function CashView({ transactions, employees }: CashViewProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transactionType, setTransactionType] = useState<'INCOME' | 'OUTCOME'>('OUTCOME');
+  const [incomeSource, setIncomeSource] = useState<'treasury' | 'employee'>('treasury');
 
   // Calculate totals
   const totalIncome = transactions.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
@@ -24,21 +26,33 @@ export default function CashView({ transactions, employees }: CashViewProps) {
   const handleFormSubmit = async (formData: FormData) => {
     setIsLoading(true);
     setError(null);
+    
+    // Reset employeeId if it's a treasury income
+    if (formData.get('type') === 'INCOME' && formData.get('incomeSource') === 'treasury') {
+      formData.delete('employeeId');
+    }
+
     const result = await addCashTransaction(formData);
     if (result?.error) {
       setError(result.error);
+    } else {
+      // Reset form on success
+      const form = document.getElementById('cash-transaction-form') as HTMLFormElement;
+      form?.reset();
+      // Reset states to default
+      setTransactionType('OUTCOME');
+      setIncomeSource('treasury');
     }
     setIsLoading(false);
-    // This is a simple way to reset the form. A more robust solution might be needed.
-    const form = document.getElementById('add-loan-form') as HTMLFormElement;
-    form?.reset();
   };
+  
+  const isEmployeeRequired = transactionType === 'OUTCOME' || (transactionType === 'INCOME' && incomeSource === 'employee');
 
   return (
     <div id="cash-section" className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 md:p-8 mb-10">
       <h2 className="font-black text-slate-800 text-2xl mb-6 flex items-center gap-3">
         <DollarSign className="text-yellow-500" />
-        النقدية والعهد
+        إدارة النقدية والعهد
       </h2>
 
       {/* Totals Display */}
@@ -59,36 +73,74 @@ export default function CashView({ transactions, employees }: CashViewProps) {
         </div>
       </div>
 
-      {/* Action Forms */}
-      <div className="max-w-lg mx-auto mb-8">
-        {/* Add Loan (Advance) Form */}
-        <form id="add-loan-form" action={handleFormSubmit} className="bg-slate-50 p-6 rounded-2xl border">
-          <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><PlusCircle size={20} /> إضافة سلفة لموظف</h3>
-          <input type="hidden" name="type" value="OUTCOME" />
+      {/* Action Form */}
+      <div className="max-w-2xl mx-auto mb-8">
+        <form id="cash-transaction-form" action={handleFormSubmit} className="bg-slate-50 p-6 rounded-2xl border" key={`${transactionType}-${incomeSource}`}>
+          <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><PlusCircle size={20} /> إضافة حركة نقدية</h3>
+          
+          {/* Transaction Type Selection */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <label className={`flex items-center justify-center gap-2 p-4 rounded-lg cursor-pointer transition-all ${transactionType === 'OUTCOME' ? 'bg-red-500 text-white shadow-lg' : 'bg-white border'}`}>
+                <ArrowDown size={20} />
+                <span className="font-bold">سند دفع (مصروف)</span>
+                <input type="radio" name="type" value="OUTCOME" checked={transactionType === 'OUTCOME'} onChange={() => setTransactionType('OUTCOME')} className="sr-only" />
+            </label>
+            <label className={`flex items-center justify-center gap-2 p-4 rounded-lg cursor-pointer transition-all ${transactionType === 'INCOME' ? 'bg-green-500 text-white shadow-lg' : 'bg-white border'}`}>
+                <ArrowUp size={20} />
+                <span className="font-bold">سند قبض (إيراد)</span>
+                <input type="radio" name="type" value="INCOME" checked={transactionType === 'INCOME'} onChange={() => setTransactionType('INCOME')} className="sr-only" />
+            </label>
+          </div>
+
+          {/* Income Source Selection */}
+          {transactionType === 'INCOME' && (
+            <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4">
+              <p className="text-sm font-bold mb-2 text-green-800">مصدر الإيراد:</p>
+              <div className="grid grid-cols-2 gap-2">
+                 <label className={`flex items-center justify-center p-3 rounded-lg cursor-pointer transition-all text-sm ${incomeSource === 'treasury' ? 'bg-green-600 text-white shadow' : 'bg-white border'}`}>
+                    <span className="font-bold">من الخزنة</span>
+                    <input type="radio" name="incomeSource" value="treasury" checked={incomeSource === 'treasury'} onChange={() => setIncomeSource('treasury')} className="sr-only" />
+                </label>
+                 <label className={`flex items-center justify-center p-3 rounded-lg cursor-pointer transition-all text-sm ${incomeSource === 'employee' ? 'bg-green-600 text-white shadow' : 'bg-white border'}`}>
+                    <span className="font-bold">سداد من موظف</span>
+                    <input type="radio" name="incomeSource" value="employee" checked={incomeSource === 'employee'} onChange={() => setIncomeSource('employee')} className="sr-only" />
+                </label>
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-4">
+            {/* Employee Selection */}
+            {isEmployeeRequired && (
+                <div>
+                  <label htmlFor="employeeId" className="block text-sm font-bold text-slate-600 mb-1">اختر الموظف</label>
+                  <select id="employeeId" name="employeeId" required className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition">
+                    <option value="">-- اختر --</option>
+                    {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                  </select>
+                </div>
+            )}
+            
+            {/* Amount */}
             <div>
-              <label htmlFor="employeeId" className="block text-sm font-bold text-slate-600 mb-1">اختر الموظف</label>
-              <select id="employeeId" name="employeeId" required className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition">
-                <option value="">-- اختر --</option>
-                {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-              </select>
+              <label htmlFor="amount" className="block text-sm font-bold text-slate-600 mb-1">المبلغ</label>
+              <input type="number" id="amount" name="amount" required step="0.01" className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition" />
             </div>
+            
+            {/* Note */}
             <div>
-              <label htmlFor="loan-amount" className="block text-sm font-bold text-slate-600 mb-1">المبلغ</label>
-              <input type="number" id="loan-amount" name="amount" required step="0.01" className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition" />
+              <label htmlFor="note" className="block text-sm font-bold text-slate-600 mb-1">ملاحظات (البيان)</label>
+              <input type="text" id="note" name="note" required className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition" />
             </div>
-            <div>
-              <label htmlFor="loan-note" className="block text-sm font-bold text-slate-600 mb-1">ملاحظات (اختياري)</label>
-              <input type="text" id="loan-note" name="note" defaultValue="سلفة" className="w-full p-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 transition" />
-            </div>
-            <button type="submit" disabled={isLoading} className="w-full bg-blue-600 text-white font-bold p-3 rounded-lg hover:bg-blue-700 transition disabled:bg-slate-400">
-              {isLoading ? 'جاري الحفظ...' : 'حفظ السلفة'}
+            
+            <button type="submit" disabled={isLoading} className={`w-full font-bold p-3 rounded-lg text-white transition disabled:bg-slate-400 ${transactionType === 'INCOME' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
+              {isLoading ? 'جاري الحفظ...' : (transactionType === 'INCOME' ? 'حفظ الإيراد' : 'حفظ المصروف')}
             </button>
           </div>
         </form>
       </div>
 
-      {error && <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-6"><b>خطأ:</b> {error}</div>}
+      {error && <div className="bg-red-100 text-red-700 p-3 rounded-lg mb-6 max-w-2xl mx-auto"><b>خطأ:</b> {error}</div>}
 
       {/* Transactions Table */}
       <div>
@@ -100,7 +152,7 @@ export default function CashView({ transactions, employees }: CashViewProps) {
                 <th className="p-4">التاريخ</th>
                 <th className="p-4">النوع</th>
                 <th className="p-4">المبلغ</th>
-                <th className="p-4">الموظف</th>
+                <th className="p-4">الموظف / المصدر</th>
                 <th className="p-4">ملاحظات</th>
               </tr>
             </thead>
@@ -110,13 +162,13 @@ export default function CashView({ transactions, employees }: CashViewProps) {
                   <td className="p-4 text-sm text-slate-600">{new Date(t.createdAt).toLocaleString('ar-EG')}</td>
                   <td className="p-4">
                     <span className={`px-3 py-1 text-xs font-bold rounded-full ${t.type === 'INCOME' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {t.type === 'INCOME' ? 'إيداع' : 'صرف'}
+                      {t.type === 'INCOME' ? 'قبض' : 'صرف'}
                     </span>
                   </td>
                   <td className={`p-4 font-mono font-bold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
-                    {t.amount.toFixed(2)}
+                    {t.type === 'INCOME' ? '+' : '-'}{t.amount.toFixed(2)}
                   </td>
-                  <td className="p-4 text-sm font-bold">{t.employee?.name || '---'}</td>
+                  <td className="p-4 text-sm font-bold">{t.employee?.name || 'خزنة'}</td>
                   <td className="p-4 text-xs text-slate-500 italic">{t.note}</td>
                 </tr>
               ))}
