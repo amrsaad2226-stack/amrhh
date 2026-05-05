@@ -5,6 +5,8 @@
 import db from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
+// (The existing addCashTransaction function remains here)
+
 export async function addCashTransaction(formData: FormData) {
   try {
     // --- 1. Get Data ---
@@ -33,21 +35,17 @@ export async function addCashTransaction(formData: FormData) {
 
     // --- 3. Conditional Logic ---
     if (type === 'OUTCOME') {
-      // This is an advance (سلفة) to an employee. Employee is required.
       if (!employeeId) {
         return { error: "يجب اختيار الموظف عند تسجيل سند دفع (سلفة)." };
       }
       shouldConnectEmployee = true;
     } else if (type === 'INCOME') {
-      // This is a deposit. Check the source.
       if (incomeSource === 'employee') {
-        // Repayment from an employee. Employee is required.
         if (!employeeId) {
           return { error: "يجب اختيار الموظف عند تسجيل سداد منه." };
         }
         shouldConnectEmployee = true;
       } 
-      // If incomeSource is 'treasury', employee is not needed. `shouldConnectEmployee` remains false.
     }
 
     // --- 4. Database Operation ---
@@ -66,12 +64,36 @@ export async function addCashTransaction(formData: FormData) {
 
     // --- 5. Revalidation ---
     revalidatePath("/admin/cash");
-    revalidatePath("/admin"); // Also revalidate admin dashboard as it may show related totals
+    revalidatePath("/admin");
 
     return { success: true };
 
   } catch (err) {
     console.error(err);
     return { error: "حدث خطأ غير متوقع أثناء حفظ الحركة. الرجاء المحاولة مرة أخرى." };
+  }
+}
+
+
+/**
+ * Deletes a cash transaction by its ID.
+ */
+export async function deleteCashTransaction(transactionId: number) {
+  try {
+    if (typeof transactionId !== 'number') {
+      return { error: "معرف الحركة غير صالح." };
+    }
+
+    await db.cashTransaction.delete({
+      where: { id: transactionId },
+    });
+
+    revalidatePath("/admin/cash");
+    revalidatePath("/admin");
+
+    return { success: true };
+  } catch (err) {
+    console.error(err);
+    return { error: "حدث خطأ أثناء حذف الحركة." };
   }
 }
