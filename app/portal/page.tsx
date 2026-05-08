@@ -1,4 +1,3 @@
-
 import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -26,6 +25,7 @@ export default async function EmployeePortal() {
 
   if (!employee) redirect("/login");
 
+  // --- تحديد فترة الراتب أولاً بناءً على نوع الموظف ---
   const now = new Date();
   let startDate: Date;
   let endDate: Date;
@@ -68,34 +68,39 @@ export default async function EmployeePortal() {
       break;
   }
 
-  const { records: processedAttendance, openingBalance } = await getEmployeePortalAttendance(empId, startDate, endDate);
+  // تمرير تواريخ فترة الراتب كاملة للحصول على التراكمي الصحيح
+  const processedAttendance = await getEmployeePortalAttendance(empId, startDate, endDate);
 
   const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
+  // --- حساب الساعات بشكل لحظي (مغلق + مفتوح) ---
   let totalHoursWorked = 0;
   const rightNow = new Date();
 
   processedAttendance.forEach(record => {
     if (record.checkIn && record.checkOut) {
-      totalHoursWorked += record.duration || 0;
+      const hrs = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
+      totalHoursWorked += Math.max(0, hrs);
     } else if (record.checkIn && !record.checkOut) {
       const hrs = (rightNow.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
       totalHoursWorked += Math.max(0, hrs);
     }
   });
 
-  const netEarningsThisPeriod = processedAttendance
-    .filter(r => r.netDailyPay && r.netDailyPay !== "-")
-    .reduce((acc, r) => acc + parseFloat(r.netDailyPay), 0);
-  
-  const currentTotalSalary = openingBalance + netEarningsThisPeriod;
+  // --- جلب الراتب من آخر "صافي" تم حسابه للفترة ---
+  let currentTotalSalary = 0;
+  const lastRecordWithBalance = [...processedAttendance].reverse().find(
+    r => r.balance && r.balance !== "-" && r.balance !== "مفتوح"
+  );
 
-  // Filter records for display (last 7 days)
+  if (lastRecordWithBalance) {
+    currentTotalSalary = parseFloat(lastRecordWithBalance.balance) || 0;
+  }
+
+  // --- تصفية السجلات للعرض (آخر 7 أيام فقط لتخفيف الواجهة) ---
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
-
   const displayAttendanceRecords = processedAttendance.filter(r => new Date(r.date) >= sevenDaysAgo);
 
   return (
@@ -120,8 +125,7 @@ export default async function EmployeePortal() {
         <PortalView 
           employee={employee} 
           isCurrentlyIn={isCurrentlyIn}
-          attendanceRecords={displayAttendanceRecords}
-          openingBalance={openingBalance}
+          attendanceRecords={displayAttendanceRecords} // تمرير آخر 7 أيام فقط للعرض
           totalEarnings={currentTotalSalary} 
           totalHours={totalHoursWorked}
           targetHours={targetHours}

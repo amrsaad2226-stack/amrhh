@@ -160,51 +160,14 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
   }
 }
 
-async function calculateOpeningBalance(empId: number, startDate: Date): Promise<number> {
-  const employee = await db.employee.findUnique({ where: { id: empId } });
-  if (!employee) return 0;
-
-  const empDailyHours = employee.dailyHours || 8;
-  const empDailySalary = employee.dailySalary || 0;
-  const hourlyRate = empDailyHours > 0 ? empDailySalary / empDailyHours : 0;
-
-  // Calculate earnings from previous attendance
-  const prevAttendances = await db.attendance.findMany({
-    where: {
-      employeeId: empId,
-      date: { lt: startDate },
-      checkOut: { not: null },
-    },
-  });
-
-  const totalPrevHours = prevAttendances.reduce((acc, rec) => acc + (rec.duration || 0), 0);
-  const totalPrevEarnings = totalPrevHours * hourlyRate;
-
-  // Calculate previous cash advances
-  const prevAdvances = await db.cashTransaction.findMany({
-    where: {
-      employeeId: empId,
-      type: 'OUTCOME',
-      createdAt: { lt: startDate },
-    },
-  });
-
-  const totalPrevAdvances = prevAdvances.reduce((acc, trans) => acc + trans.amount, 0);
-
-  return totalPrevEarnings - totalPrevAdvances;
-}
-
-
 export async function getEmployeePortalAttendance(empId: number, startDate?: Date, endDate?: Date) {
   
   const defaultStart = new Date();
   defaultStart.setDate(defaultStart.getDate() - 7);
-  defaultStart.setHours(0, 0, 0, 0); // Set to the beginning of the day
   
   const start = startDate || defaultStart;
 
-  const openingBalance = await calculateOpeningBalance(empId, start);
-
+  // --- 1. Fetch Cash Advances ---
   const cashAdvances = await db.cashTransaction.findMany({
     where: {
       employeeId: empId,
@@ -216,8 +179,10 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
     },
   });
 
+  // --- 2. Group Advances by Day ---
   const dailyAdvances: Record<string, number> = {};
   cashAdvances.forEach(advance => {
+    // Ensure the date is interpreted correctly according to local timezone before getting the date part
     const localDate = new Date(advance.createdAt.toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
     const dateStr = localDate.toISOString().split("T")[0];
     if (!dailyAdvances[dateStr]) {
@@ -226,6 +191,7 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
     dailyAdvances[dateStr] += advance.amount;
   });
 
+  // --- 3. Fetch Attendance Records ---
   const records = await db.attendance.findMany({
     where: {
       employeeId: empId,
@@ -244,15 +210,19 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
     const key = `${r.employeeId}_${dateStr}`;
     if (!dailyTotals[key]) dailyTotals[key] = 0;
 
-    let hrs = r.duration || 0;
+    let hrs = 0;
+    if (r.checkIn && r.checkOut) {
+      hrs = (r.checkOut.getTime() - r.checkIn.getTime()) / (1000 * 60 * 60);
+      if (hrs < 0) hrs += 24;
+    }
     dailyTotals[key] += hrs;
   });
 
-  let cumulativeBalance = openingBalance; // Initialize with opening balance
+  let cumulativeBalance = 0;
   let currentDayStr = "";
   let accumulatedDayHours = 0;
 
-  const processedRecords = records.map((record, index) => {
+  return records.map((record, index) => {
     const dateStr = record.date.toISOString().split("T")[0];
 
     if (currentDayStr !== dateStr) {
@@ -264,7 +234,13 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
     const empDailySalary = record.employee.dailySalary || 0;
     const hourlyRate = empDailyHours > 0 ? empDailySalary / empDailyHours : 0;
 
-    accumulatedDayHours += record.duration || 0;
+    let sessionHours = 0;
+    if (record.checkIn && record.checkOut) {
+      sessionHours = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
+      if (sessionHours < 0) sessionHours += 24;
+    }
+
+    accumulatedDayHours += sessionHours;
 
     const isLastOfDay =
       index === records.length - 1 ||
@@ -291,7 +267,7 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
       cumulativeBalance += netPay;
       displayBalance = Math.round(cumulativeBalance).toString();
       dailyAdvance = advanceForDay > 0 ? advanceForDay.toFixed(2) : "-";
-      netDailyPay = Math.round(netPay).toString();
+      netDailyPay = netPay.toFixed(2);
 
     } else if (!record.checkOut) {
       deficit = "مفتوح";
@@ -308,6 +284,4 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
       netDailyPay: netDailyPay
     };
   });
-
-  return { records: processedRecords, openingBalance };
 }

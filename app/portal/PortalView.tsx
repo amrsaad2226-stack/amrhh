@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import SalaryDashboard from "./_components/SalaryDashboard";
-import { Clock, Calendar, ChevronLeft, History, Download, DollarSign, Archive } from "lucide-react";
+import { Clock, Calendar, ChevronLeft, History, Download, DollarSign } from "lucide-react";
 
+// Helper to format time
 const formatTime = (dateString: string | null) => {
   if (!dateString) return "--:--";
   return new Date(dateString).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
@@ -15,7 +16,6 @@ interface PortalViewProps {
   employee: any;
   isCurrentlyIn: boolean;
   attendanceRecords: any[];
-  openingBalance: number;
   totalEarnings: number;
   totalHours: number;
   targetHours: number;
@@ -26,7 +26,6 @@ export default function PortalView({
   employee, 
   isCurrentlyIn, 
   attendanceRecords,
-  openingBalance,
   totalEarnings,
   totalHours,
   targetHours,
@@ -45,7 +44,7 @@ export default function PortalView({
     try {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
-      const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' }); // Use landscape for more columns
 
       const tajawalFont = await fetch('/fonts/Tajawal-Regular.ttf').then(res => res.arrayBuffer());
       doc.addFileToVFS('Tajawal-Regular.ttf', btoa(String.fromCharCode(...new Uint8Array(tajawalFont))));
@@ -53,8 +52,6 @@ export default function PortalView({
       doc.setFont('Tajawal');
 
       doc.text(`سجل حضور الموظف: ${employee.name}`, doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
-      doc.text(`الرصيد السابق: ${openingBalance.toFixed(2)} ج`, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
-
 
       const tableColumn = ["رصيد تراكمي", "صافي اليوم", "سلف", "إضافي", "عجز", "ساعات", "انصراف", "حضور", "تاريخ"];
       const tableRows: any[][] = [];
@@ -78,10 +75,18 @@ export default function PortalView({
       autoTable(doc, {
         head: [tableColumn.reverse()],
         body: tableRows.map(row => row.reverse()),
-        startY: 30,
+        startY: 25,
         theme: 'grid',
-        styles: { font: 'Tajawal', halign: 'right' },
-        headStyles: { fillColor: [59, 130, 246], font: 'Tajawal', halign: 'right', fontStyle: 'normal' }
+        styles: {
+          font: 'Tajawal', 
+          halign: 'right'
+        },
+        headStyles: {
+          fillColor: [59, 130, 246],
+          font: 'Tajawal',
+          halign: 'right',
+          fontStyle: 'normal'
+        }
       });
       
       doc.save(`attendance_report_${employee.code}.pdf`);
@@ -126,18 +131,6 @@ export default function PortalView({
         targetHours={targetHours}
         periodLabel={periodLabel}
       />
-
-      {openingBalance !== 0 && (
-        <div className="bg-amber-50 dark:bg-amber-500/10 border-r-4 border-amber-400 p-4 rounded-2xl flex items-center justify-between">
-            <div>
-                <p className="text-xs font-bold text-amber-600 dark:text-amber-400">الرصيد المدور من الفترة السابقة</p>
-                <p className={`text-lg font-black ${openingBalance > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {openingBalance.toFixed(2)} جنيه
-                </p>
-            </div>
-            <Archive className="text-amber-400" size={28}/>
-        </div>
-      )}
 
       <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
 
