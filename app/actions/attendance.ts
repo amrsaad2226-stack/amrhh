@@ -160,31 +160,7 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
   }
 }
 
-export async function getEmployeePortalAttendance(empId: number) {
-  
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 7);
-  startDate.setHours(0, 0, 0, 0);
-
-  const lastRecordBeforeStartDate = await db.attendance.findFirst({
-    where: {
-        employeeId: empId,
-        date: { lt: startDate },
-        checkOut: { not: null },
-    },
-    orderBy: { date: 'desc' },
-  });
-
-  const previousBalance = (lastRecordBeforeStartDate as any)?.balance ? parseFloat((lastRecordBeforeStartDate as any).balance) : 0;
-
-  const cashAdvances = await db.cashTransaction.findMany({
-    where: {
-      employeeId: empId,
-      type: 'OUTCOME',
-      createdAt: { gte: startDate }
-    },
-  });
-
+async function calculateMetrics(records: any[], cashAdvances: any[], initialBalance: number) {
   const dailyAdvances: Record<string, number> = {};
   cashAdvances.forEach(advance => {
     const localDate = new Date(advance.createdAt.toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
@@ -193,15 +169,6 @@ export async function getEmployeePortalAttendance(empId: number) {
       dailyAdvances[dateStr] = 0;
     }
     dailyAdvances[dateStr] += advance.amount;
-  });
-
-  const records = await db.attendance.findMany({
-    where: {
-      employeeId: empId,
-      date: { gte: startDate }
-    },
-    include: { employee: true },
-    orderBy: [{ date: "asc" }, { checkIn: "asc" }],
   });
 
   const dailyTotals: Record<string, number> = {};
@@ -218,7 +185,7 @@ export async function getEmployeePortalAttendance(empId: number) {
     dailyTotals[key] += hrs;
   });
 
-  let cumulativeBalance = previousBalance;
+  let cumulativeBalance = initialBalance;
   let currentDayStr = "";
   let accumulatedDayHours = 0;
 
@@ -284,6 +251,64 @@ export async function getEmployeePortalAttendance(empId: number) {
       netDailyPay: netDailyPay
     };
   });
+
+  return { processedRecords, finalBalance: cumulativeBalance };
+}
+
+export async function getEmployeePortalAttendance(empId: number) {
+  
+  const viewStartDate = new Date();
+  viewStartDate.setDate(viewStartDate.getDate() - 7);
+  viewStartDate.setHours(0, 0, 0, 0);
+
+  // --- 1. Calculate Previous Balance from all historical data ---
+  const historicalRecords = await db.attendance.findMany({
+    where: {
+      employeeId: empId,
+      date: { lt: viewStartDate },
+      checkOut: { not: null } 
+    },
+    include: { employee: true },
+    orderBy: [{ date: "asc" }, { checkIn: "asc" }],
+  });
+
+  const historicalCashAdvances = await db.cashTransaction.findMany({
+    where: {
+      employeeId: empId,
+      type: 'OUTCOME',
+      createdAt: { lt: viewStartDate }
+    },
+  });
+
+  const { finalBalance: previousBalance } = await calculateMetrics(
+    historicalRecords,
+    historicalCashAdvances,
+    0
+  );
+
+  // --- 2. Calculate and process current period's data ---
+  const currentRecords = await db.attendance.findMany({
+    where: {
+      employeeId: empId,
+      date: { gte: viewStartDate },
+    },
+    include: { employee: true },
+    orderBy: [{ date: "asc" }, { checkIn: "asc" }],
+  });
+
+  const currentCashAdvances = await db.cashTransaction.findMany({
+    where: {
+      employeeId: empId,
+      type: 'OUTCOME',
+      createdAt: { gte: viewStartDate }
+    },
+  });
+
+  const { processedRecords } = await calculateMetrics(
+    currentRecords,
+    currentCashAdvances,
+    previousBalance
+  );
 
   return { records: processedRecords, previousBalance };
 }
