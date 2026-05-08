@@ -1,3 +1,4 @@
+
 "use server";
 import prisma from "@/lib/db"; 
 
@@ -14,13 +15,16 @@ export async function getEmployeesList() {
 
 export async function getDetailedLog(empId: string, startDate: string, endDate: string) {
   try {
+    const sDate = new Date(startDate);
+    const eDate = new Date(endDate);
+    eDate.setHours(23, 59, 59, 999); // Ensure end date includes the entire day
+
     const whereClause: any = {
       date: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
+        gte: sDate,
+        lte: eDate,
       },
     };
-    
     if (empId) whereClause.employeeId = Number(empId);
 
     const records = await prisma.attendance.findMany({
@@ -31,11 +35,25 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
       orderBy:[
         { employeeId: "asc" },
         { date: "asc" },
-        { checkIn: "asc" } // 👈 إضافة هامة لترتيب بصمات نفس اليوم زمنياً
+        { checkIn: "asc" }
       ],
     });
 
-    // 1️⃣ حصر إجمالي الساعات لكل موظف في اليوم الواحد أولاً
+    const cashWhereClause: any = {
+      createdAt: {
+        gte: sDate,
+        lte: eDate,
+      },
+      type: 'OUTCOME',
+    };
+    if (empId) cashWhereClause.employeeId = Number(empId);
+    
+    const cashTransactions = await prisma.cashTransaction.findMany({
+        where: cashWhereClause,
+        include: { employee: true },
+        orderBy: [{ employeeId: "asc" }, { createdAt: 'asc' }],
+    });
+
     const dailyTotals: Record<string, number> = {};
     records.forEach(r => {
       const dateStr = r.date.toISOString().split('T')[0];
@@ -45,28 +63,23 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
       let hrs = 0;
       if (r.checkIn && r.checkOut) {
         hrs = (r.checkOut.getTime() - r.checkIn.getTime()) / (1000 * 60 * 60);
-        if (hrs < 0) hrs += 24; // معالجة الورديات المسائية عبر منتصف الليل
+        if (hrs < 0) hrs += 24;
       }
       dailyTotals[key] += hrs;
     });
 
-    // 2️⃣ بناء البيانات وعرض التراكمي
-    let cumulativeBalance = 0;
     let currentEmpId = -1;
     let currentDayStr = "";
     let accumulatedDayHours = 0;
 
-    const processedData = records.map((record, index) => {
+    const attendanceData = records.filter(r => r.employee).map((record, index) => {
       const dateStr = record.date.toISOString().split('T')[0];
 
-      // تصفير الرصيد إذا كان موظف جديد
       if (currentEmpId !== record.employeeId) {
-        cumulativeBalance = 0;
         currentEmpId = record.employeeId;
         currentDayStr = dateStr;
         accumulatedDayHours = 0;
       } 
-      // تصفير ساعات اليوم التراكمية إذا كان يوم جديد لنفس الموظف
       else if (currentDayStr !== dateStr) {
         currentDayStr = dateStr;
         accumulatedDayHours = 0;
@@ -76,17 +89,14 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
       const empDailySalary = record.employee.dailySalary || 0;
       const hourlyRate = empDailyHours > 0 ? (empDailySalary / empDailyHours) : 0;
 
-      // حساب ساعات هذه الحركة (الجلسة) فقط
       let sessionHours = 0;
       if (record.checkIn && record.checkOut) {
         sessionHours = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
         if (sessionHours < 0) sessionHours += 24;
       }
       
-      // الساعات التراكمية خلال هذا اليوم
       accumulatedDayHours += sessionHours;
 
-      // 👈 التحقق مما إذا كانت هذه هي "آخر حركة" للموظف في هذا اليوم
       const isLastOfDay = 
         index === records.length - 1 || 
         records[index + 1].employeeId !== record.employeeId || 
@@ -94,9 +104,8 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
 
       let deficit = "-";
       let overtime = "-";
-      let displayBalance = "-";
+      let dailyEarned = 0;
 
-      // تطبيق العجز والإضافي والفلوس على "آخر حركة في اليوم" فقط
       if (isLastOfDay) {
         const totalDayHrs = dailyTotals[`${record.employeeId}_${dateStr}`];
         
@@ -106,34 +115,76 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
         deficit = def > 0 ? def.toFixed(2) : "-";
         overtime = ovt > 0 ? ovt.toFixed(2) : "-";
         
-        // إضافة مستحقات هذا اليوم للرصيد التراكمي
-        const dailyEarned = totalDayHrs * hourlyRate;
-        cumulativeBalance += dailyEarned;
-        displayBalance = Math.round(cumulativeBalance).toString();
+        dailyEarned = totalDayHrs * hourlyRate;
       }
 
       return {
         id: record.id,
+        employeeId: record.employeeId,
+        type: 'ATTENDANCE',
         empName: record.employee.name,
         defaultHrs: empDailyHours, 
         date: record.date.toISOString(), 
         checkIn: record.checkIn ? record.checkIn.toISOString() : null, 
         checkOut: record.checkOut ? record.checkOut.toISOString() : null, 
-        actualHrs: accumulatedDayHours.toFixed(2), // 👈 الساعات الفعلية تظهر بشكل تراكمي
+        actualHrs: accumulatedDayHours.toFixed(2),
         deficit: deficit,
         overtime: overtime,
-        balance: displayBalance, 
+        isLastOfDay,
+        dailyEarned,
+        amount: null,
+        notes: null,
+        balance: "-", // Placeholder
       };
     });
 
-    return { success: true, data: processedData };
+    const cashData = cashTransactions.filter(t => t.employee).map(t => ({
+        id: t.id,
+        employeeId: t.employeeId,
+        type: 'CASH',
+        empName: t.employee!.name, 
+        date: t.createdAt.toISOString(),
+        checkIn: null, checkOut: null, defaultHrs: '-', actualHrs: '-', deficit: '-', overtime: '-',
+        isLastOfDay: false,
+        dailyEarned: 0,
+        amount: t.amount,
+        notes: (t as any).notes || null, // FIX: Use type assertion to bypass TS error
+        balance: '-', 
+    }));
+    
+    const combinedData: any[] = [...attendanceData, ...cashData];
+    combinedData.sort((a, b) => {
+        if (a.employeeId !== b.employeeId) {
+            return (a.employeeId || 0) - (b.employeeId || 0);
+        }
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+
+    let cumulativeBalance = 0;
+    currentEmpId = -1;
+    
+    for (const item of combinedData) {
+        if (currentEmpId !== item.employeeId) {
+            cumulativeBalance = 0;
+            currentEmpId = item.employeeId;
+        }
+
+        if (item.type === 'ATTENDANCE' && item.isLastOfDay) {
+            cumulativeBalance += item.dailyEarned;
+        } else if (item.type === 'CASH') {
+            cumulativeBalance -= item.amount;
+        }
+
+        item.balance = Math.round(cumulativeBalance);
+    }
+
+    return { success: true, data: combinedData };
   } catch (error: any) {
     console.error("Fetch error:", error);
     return { error: "حدث خطأ أثناء جلب البيانات" };
   }
 }
 
-// دالة حذف سجل الحضور
 export async function deleteAttendanceRecord(id: number) {
   try {
     await prisma.attendance.delete({ where: { id } });
@@ -143,7 +194,6 @@ export async function deleteAttendanceRecord(id: number) {
   }
 }
 
-// دالة تعديل وقت الحضور والانصراف
 export async function updateAttendanceRecord(id: number, checkInTime: string | null, checkOutTime: string | null) {
   try {
     const existing = await prisma.attendance.findUnique({
@@ -156,7 +206,6 @@ export async function updateAttendanceRecord(id: number, checkInTime: string | n
     let newCheckIn = existing.checkIn;
     let newCheckOut = existing.checkOut;
 
-    // دالة مساعدة لدمج الوقت الجديد (HH:mm) مع تاريخ السجل الأصلي
     const applyTime = (baseDate: Date, timeStr: string) => {
       const [hours, minutes] = timeStr.split(':').map(Number);
       const newDate = new Date(baseDate);
@@ -167,12 +216,11 @@ export async function updateAttendanceRecord(id: number, checkInTime: string | n
     if (checkInTime) newCheckIn = applyTime(existing.date, checkInTime);
     if (checkOutTime) newCheckOut = applyTime(existing.date, checkOutTime);
 
-    // تحديث ساعات العمل (Duration) والإضافي (Overtime) في قاعدة البيانات
     let duration = 0;
     let overtime = 0;
     if (newCheckIn && newCheckOut) {
       duration = (newCheckOut.getTime() - newCheckIn.getTime()) / (1000 * 60 * 60);
-      if (duration < 0) duration += 24; // للورديات المسائية عبر منتصف الليل
+      if (duration < 0) duration += 24; 
       
       const requiredHours = existing.requiredHours || existing.employee.dailyHours || 10;
       if (duration > requiredHours) {

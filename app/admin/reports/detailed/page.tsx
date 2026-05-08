@@ -1,38 +1,22 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { getEmployeesList, getDetailedLog } from '@/app/actions/reports';
-import { Search, Filter, Calendar, Loader2, Database, AlertCircle } from 'lucide-react';
+import { Search, Filter, Calendar, Loader2, Database, AlertCircle, DollarSign, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
-import AttendanceRow from './AttendanceRow'; // 👈 استيراد المكون
+// import AttendanceRow from './AttendanceRow'; // 👈 لم نعد بحاجة إليه
 
-// دالة مساعدة لتحويل التوقيت
 const formatTime = (dateString: string | null) => {
   if (!dateString) return '--:--';
-  try {
-    return new Date(dateString).toLocaleTimeString('ar-EG', {
-      timeZone: 'Africa/Cairo',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch (e) {
-    return 'تاريخ خاطئ';
-  }
+  return new Date(dateString).toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' });
 };
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return '-';
-  try {
-    return new Date(dateString).toLocaleDateString('ar-EG', {
-      timeZone: 'Africa/Cairo',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch (e) {
-    return 'تاريخ خاطئ';
-  }
+  return new Date(dateString).toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', day: '2-digit', month: '2-digit', year: 'numeric' });
 };
+
 
 export default function DetailedLogPage() {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -76,7 +60,7 @@ export default function DetailedLogPage() {
       setRecords(res.data || []);
       setHasSearched(true);
       if (res.data) {
-        toast.success(`تم استدعاء ${res.data.length} سجل بنجاح`);
+        toast.success(`تم استدعاء ${res.data.length} حركة بنجاح`);
       }
     }
     setIsFetching(false);
@@ -96,7 +80,7 @@ export default function DetailedLogPage() {
             <Database className="text-blue-600" /> سجل الحركات التفصيلي
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-bold">
-            استعرض حضور وانصراف الموظفين مع حسابات العجز والإضافي
+            استعرض حضور وانصراف الموظفين مع السلف والمستحقات
           </p>
         </div>
       </div>
@@ -167,7 +151,7 @@ export default function DetailedLogPage() {
           <AlertCircle size={48} className="text-slate-400 mb-4" />
           <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">لا توجد سجلات</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">
-            لا يوجد حضور وانصراف يطابق الفلتر الذي حددته.
+            لا يوجد حضور وانصراف أو سلف تطابق الفلتر الذي حددته.
           </p>
         </div>
       ) : (
@@ -190,21 +174,61 @@ export default function DetailedLogPage() {
               <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-black border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="p-4">الاسم</th>
-                  <th className="p-4 text-center">التاريخ</th>
-                  <th className="p-4 text-center">دخول</th>
-                  <th className="p-4 text-center">خروج</th>
-                  <th className="p-4 text-center">الافتراضي</th>
-                  <th className="p-4 text-center text-blue-600 dark:text-blue-400">الفعلي (س)</th>
-                  <th className="p-4 text-center text-red-500">عجز (س)</th>
-                  <th className="p-4 text-center text-green-500">إضافي (س)</th>
-                  <th className="p-4 text-center text-amber-600 dark:text-amber-400">تراكمي</th>
-                  <th className="p-4 text-center">إجراءات</th>
+                  <th className="p-4 text-center">التاريخ والوقت</th>
+                  <th className="p-4 text-center">البيان</th>
+                  <th className="p-4 text-center">له</th>
+                  <th className="p-4 text-center">عليه</th>
+                  <th className="p-4 text-center text-amber-600 dark:text-amber-400">الرصيد التراكمي</th>
+                  <th className="p-4 text-center">ملاحظات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold text-slate-700 dark:text-slate-300">
-                {filteredRecords.map((record) => (
-                  <AttendanceRow key={record.id} record={record} onRefresh={handleFetchData} />
-                ))}
+                {filteredRecords.map((record) => {
+                  if (record.type === 'CASH') {
+                    return (
+                      <tr key={`cash-${record.id}`} className="bg-red-50/50 dark:bg-red-900/10 hover:bg-red-50/80">
+                        <td className="p-4">{record.empName}</td>
+                        <td className="p-4 text-center">{formatTime(record.date)} <span className="text-slate-400 font-normal text-xs">({formatDate(record.date)})</span></td>
+                        <td className="p-4 text-center font-black flex items-center justify-center gap-2">
+                           <ArrowUp className="text-red-500" size={16} /> سلفة نقدية
+                        </td>
+                        <td className="p-4 text-center text-slate-500">-</td>
+                        <td className="p-4 text-center text-red-500 font-black">{record.amount?.toFixed(2) || '0.00'}</td>
+                        <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
+                        <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes || "-"}</td>
+                      </tr>
+                    );
+                  }
+
+                  // Default is ATTENDANCE
+                  return (
+                    <tr key={`att-${record.id}`} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
+                       <td className="p-4">{record.empName}</td>
+                       <td className="p-4 text-center">
+                        {formatTime(record.checkIn)}
+                        {record.checkOut && <span className="mx-1 text-slate-400">-</span>} 
+                        {formatTime(record.checkOut)} 
+                        <span className="text-slate-400 font-normal text-xs"> ({formatDate(record.date)})</span>
+                       </td>
+                       <td className="p-4 text-center flex items-center justify-center gap-2">
+                          <Clock size={16} className="text-blue-500" />
+                          حركة حضور
+                       </td>
+                       <td className="p-4 text-center text-green-500 font-black">
+                         {record.isLastOfDay ? record.dailyEarned.toFixed(2) : '-'}
+                       </td>
+                       <td className="p-4 text-center text-slate-500">-</td>
+                       <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">
+                         {record.isLastOfDay ? record.balance : '-'}
+                        </td>
+                       <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">
+                        {record.deficit !== '-' && <span className="text-red-500">عجز: {record.deficit} س</span>}
+                        {record.overtime !== '-' && <span className="text-green-500 ml-2">إضافي: {record.overtime} س</span>}
+                        {record.isLastOfDay && <span> (إجمالي العمل: {record.actualHrs} س)</span>}
+                       </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 
@@ -219,3 +243,4 @@ export default function DetailedLogPage() {
     </div>
   );
 }
+
