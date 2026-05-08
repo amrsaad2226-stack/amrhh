@@ -1,3 +1,4 @@
+
 import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -25,56 +26,31 @@ export default async function EmployeePortal() {
 
   if (!employee) redirect("/login");
 
-  // --- تحديد فترة الراتب أولاً بناءً على نوع الموظف ---
   const now = new Date();
-  let startDate: Date;
-  let endDate: Date;
   let targetHours: number;
   let periodLabel: string;
 
-  const getStartOfWeek = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getDay(); 
-    const diff = (day + 1) % 7; 
-    date.setDate(date.getDate() - diff);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  };
-
   switch (employee.salaryType) {
     case SalaryType.DAILY:
-      startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
       targetHours = employee.dailyHours || 8;
       periodLabel = "اليوم";
       break;
     case SalaryType.WEEKLY:
-      startDate = getStartOfWeek(now);
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
       targetHours = (employee.dailyHours || 8) * (employee.offDay === 'NONE' ? 7 : 6);
       periodLabel = "الأسبوع";
       break;
     case SalaryType.MONTHLY:
     default:
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      endDate.setHours(23, 59, 59, 999);
       targetHours = (employee.dailyHours || 8) * 26; 
       periodLabel = "الشهر";
       break;
   }
 
-  // تمرير تواريخ فترة الراتب كاملة للحصول على التراكمي الصحيح
-  const processedAttendance = await getEmployeePortalAttendance(empId, startDate, endDate);
+  const { records: processedAttendance, previousBalance } = await getEmployeePortalAttendance(empId);
 
   const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
-  // --- حساب الساعات بشكل لحظي (مغلق + مفتوح) ---
   let totalHoursWorked = 0;
   const rightNow = new Date();
 
@@ -88,7 +64,6 @@ export default async function EmployeePortal() {
     }
   });
 
-  // --- جلب الراتب من آخر "صافي" تم حسابه للفترة ---
   let currentTotalSalary = 0;
   const lastRecordWithBalance = [...processedAttendance].reverse().find(
     r => r.balance && r.balance !== "-" && r.balance !== "مفتوح"
@@ -96,12 +71,9 @@ export default async function EmployeePortal() {
 
   if (lastRecordWithBalance) {
     currentTotalSalary = parseFloat(lastRecordWithBalance.balance) || 0;
+  } else {
+    currentTotalSalary = previousBalance;
   }
-
-  // --- تصفية السجلات للعرض (آخر 7 أيام فقط لتخفيف الواجهة) ---
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const displayAttendanceRecords = processedAttendance.filter(r => new Date(r.date) >= sevenDaysAgo);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 p-4 md:p-8 font-sans text-right pb-20" dir="rtl">
@@ -125,7 +97,8 @@ export default async function EmployeePortal() {
         <PortalView 
           employee={employee} 
           isCurrentlyIn={isCurrentlyIn}
-          attendanceRecords={displayAttendanceRecords} // تمرير آخر 7 أيام فقط للعرض
+          attendanceRecords={processedAttendance} 
+          previousBalance={previousBalance}
           totalEarnings={currentTotalSalary} 
           totalHours={totalHoursWorked}
           targetHours={targetHours}
