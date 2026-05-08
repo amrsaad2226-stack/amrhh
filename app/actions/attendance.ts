@@ -1,3 +1,4 @@
+
 "use server";
 import db from "@/lib/db";
 import { getDistance } from "@/lib/location";
@@ -159,15 +160,38 @@ export async function checkOutAction(code: string, lat: number, lng: number, dev
   }
 }
 
-// جعلنا التواريخ اختيارية (?) لتجنب أي أخطاء في ملفات أخرى
 export async function getEmployeePortalAttendance(empId: number, startDate?: Date, endDate?: Date) {
   
-  // في حال لم يتم تمرير تواريخ (من ملفات أخرى)، نجلب آخر 7 أيام كوضع افتراضي
   const defaultStart = new Date();
   defaultStart.setDate(defaultStart.getDate() - 7);
   
   const start = startDate || defaultStart;
 
+  // --- 1. Fetch Cash Advances ---
+  const cashAdvances = await db.cashTransaction.findMany({
+    where: {
+      employeeId: empId,
+      type: 'OUTCOME',
+      createdAt: { 
+        gte: start,
+        ...(endDate ? { lte: endDate } : {})
+      }
+    },
+  });
+
+  // --- 2. Group Advances by Day ---
+  const dailyAdvances: Record<string, number> = {};
+  cashAdvances.forEach(advance => {
+    // Ensure the date is interpreted correctly according to local timezone before getting the date part
+    const localDate = new Date(advance.createdAt.toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
+    const dateStr = localDate.toISOString().split("T")[0];
+    if (!dailyAdvances[dateStr]) {
+      dailyAdvances[dateStr] = 0;
+    }
+    dailyAdvances[dateStr] += advance.amount;
+  });
+
+  // --- 3. Fetch Attendance Records ---
   const records = await db.attendance.findMany({
     where: {
       employeeId: empId,
@@ -225,18 +249,26 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
     let deficit = "-";
     let overtime = "-";
     let displayBalance = "-";
+    let dailyAdvance = "-";
+    let netDailyPay = "-";
 
     if (isLastOfDay && record.checkOut) {
-      const totalDayHrs = dailyTotals[`${record.employeeId}_${dateStr}`];
+      const totalDayHrs = dailyTotals[`${record.employeeId}_${dateStr}`] || 0;
       const def = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
       const ovt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
 
       deficit = def > 0 ? def.toFixed(2) : "-";
       overtime = ovt > 0 ? ovt.toFixed(2) : "-";
 
+      const advanceForDay = dailyAdvances[dateStr] || 0;
       const dailyEarned = totalDayHrs * hourlyRate;
-      cumulativeBalance += dailyEarned;
+      const netPay = dailyEarned - advanceForDay;
+
+      cumulativeBalance += netPay;
       displayBalance = Math.round(cumulativeBalance).toString();
+      dailyAdvance = advanceForDay > 0 ? advanceForDay.toFixed(2) : "-";
+      netDailyPay = netPay.toFixed(2);
+
     } else if (!record.checkOut) {
       deficit = "مفتوح";
     }
@@ -247,7 +279,9 @@ export async function getEmployeePortalAttendance(empId: number, startDate?: Dat
       deficit,
       overtime,
       balance: displayBalance,
-      isLastOfDay: isLastOfDay
+      isLastOfDay: isLastOfDay,
+      dailyAdvance: dailyAdvance,
+      netDailyPay: netDailyPay
     };
   });
 }

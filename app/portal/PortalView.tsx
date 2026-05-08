@@ -1,9 +1,10 @@
+
 "use client";
 import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import SalaryDashboard from "./_components/SalaryDashboard";
-import { Clock, Calendar, ChevronLeft, History, Download } from "lucide-react";
+import { Clock, Calendar, ChevronLeft, History, Download, DollarSign } from "lucide-react";
 
 // Helper to format time
 const formatTime = (dateString: string | null) => {
@@ -43,23 +44,26 @@ export default function PortalView({
     try {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
-      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' }); // Use landscape for more columns
 
       const tajawalFont = await fetch('/fonts/Tajawal-Regular.ttf').then(res => res.arrayBuffer());
       doc.addFileToVFS('Tajawal-Regular.ttf', btoa(String.fromCharCode(...new Uint8Array(tajawalFont))));
       doc.addFont('Tajawal-Regular.ttf', 'Tajawal', 'normal');
       doc.setFont('Tajawal');
 
-      doc.text(`سجل حضور الموظف: ${employee.name}`, 105, 15, { align: 'center' });
+      doc.text(`سجل حضور الموظف: ${employee.name}`, doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
 
-      const tableColumn = ["الصافي", "الإضافي", "العجز", "ف. تراكمي", "انصراف", "حضور", "تاريخ"];
+      const tableColumn = ["رصيد تراكمي", "صافي اليوم", "سلف", "إضافي", "عجز", "ساعات", "انصراف", "حضور", "تاريخ"];
       const tableRows: any[][] = [];
 
-      attendanceRecords.reverse().forEach((record: any) => {
+      [...attendanceRecords].reverse().forEach((record: any) => {
+        if (!record.isLastOfDay) return;
         const rowData = [
-          record.isLastOfDay && record.balance !== "-" ? `${record.balance} ج` : '-',
-          record.isLastOfDay ? record.overtime : '-',
-          record.isLastOfDay ? record.deficit : '-',
+          record.balance !== "-" ? `${record.balance} ج` : '-',
+          record.netDailyPay !== "-" ? `${record.netDailyPay} ج` : '-',
+          record.dailyAdvance !== "-" ? `${record.dailyAdvance} ج` : '-',
+          record.overtime,
+          record.deficit,
           record.actualHrs,
           formatTime(record.checkOut),
           formatTime(record.checkIn),
@@ -69,8 +73,8 @@ export default function PortalView({
       });
 
       autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
+        head: [tableColumn.reverse()],
+        body: tableRows.map(row => row.reverse()),
         startY: 25,
         theme: 'grid',
         styles: {
@@ -85,7 +89,7 @@ export default function PortalView({
         }
       });
       
-      doc.save(`attendance_${employee.code}.pdf`);
+      doc.save(`attendance_report_${employee.code}.pdf`);
     } catch (error) {
       console.error("Error exporting PDF:", error);
       alert("حدث خطأ أثناء تصدير الملف.");
@@ -187,11 +191,11 @@ export default function PortalView({
                       </div>
                     </div>
                     
-                    {(record.checkOut || record.actualHrs !== '-') && (
-                      <div className="mt-4 grid grid-cols-4 gap-x-2 border-t border-slate-100 dark:border-slate-800 pt-4">
+                    {(record.isLastOfDay && record.checkOut) && (
+                      <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-x-1 gap-y-4 border-t border-slate-100 dark:border-slate-800 pt-4">
                         
                         <div className="text-center">
-                          <span className="text-xs font-bold text-slate-400 block">ف. تراكمي</span>
+                          <span className="text-xs font-bold text-slate-400 block">ساعات العمل</span>
                           <span className="text-sm font-black text-blue-600 dark:text-blue-400 mt-1 block">
                             {record.actualHrs}
                           </span>
@@ -200,21 +204,35 @@ export default function PortalView({
                         <div className="text-center">
                            <span className="text-xs font-bold text-slate-400 block">عجز</span>
                            <span className={`text-sm font-black mt-1 block ${record.deficit !== '-' ? 'text-red-500' : 'text-slate-400'}`}>
-                              {record.isLastOfDay ? record.deficit : '-'}
+                              {record.deficit}
                            </span>
                         </div>
 
                         <div className="text-center">
                            <span className="text-xs font-bold text-slate-400 block">إضافي</span>
                            <span className={`text-sm font-black mt-1 block ${record.overtime !== '-' ? 'text-green-600' : 'text-slate-400'}`}>
-                              {record.isLastOfDay ? record.overtime : '-'}
+                              {record.overtime}
                            </span>
                         </div>
 
                         <div className="text-center">
-                          <span className="text-xs font-bold text-slate-400 block">صافي</span>
-                          <span className="text-sm font-black text-amber-600 dark:text-amber-400 mt-1 block">
-                            {record.isLastOfDay && record.balance !== '-' ? `${record.balance} ج` : '-'}
+                          <span className="text-xs font-bold text-slate-400 block">سلف</span>
+                          <span className={`text-sm font-black mt-1 block ${record.dailyAdvance !== '-' ? 'text-orange-500' : 'text-slate-400'}`}>
+                            {record.dailyAdvance !== '-' ? `${record.dailyAdvance} ج` : '-'}
+                          </span>
+                        </div>
+
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">صافي اليوم</span>
+                          <span className={`text-sm font-black mt-1 block ${record.netDailyPay !== '-' ? 'text-green-600' : 'text-slate-400'}`}>
+                            {record.netDailyPay !== '-' ? `${record.netDailyPay} ج` : '-'}
+                          </span>
+                        </div>
+
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">رصيد تراكمي</span>
+                          <span className="text-base font-black text-slate-800 dark:text-slate-200 mt-1 block">
+                            {record.balance !== '-' ? `${record.balance} ج` : '-'}
                           </span>
                         </div>
                       </div>
