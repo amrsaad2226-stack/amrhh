@@ -1,11 +1,9 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { getEmployeesList, getDetailedLog } from '@/app/actions/reports';
-import { Search, Filter, Calendar, Loader2, Database, AlertCircle, DollarSign, Clock, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, Calendar, Loader2, Database, AlertCircle, DollarSign, Clock, ArrowUp, ArrowDown, Scale } from 'lucide-react';
 import { toast } from 'sonner';
-// import AttendanceRow from './AttendanceRow'; // 👈 لم نعد بحاجة إليه
 
 const formatTime = (dateString: string | null) => {
   if (!dateString) return '--:--';
@@ -56,19 +54,21 @@ export default function DetailedLogPage() {
 
     if (res.error) {
       toast.error(res.error);
+      setRecords([]);
     } else {
       setRecords(res.data || []);
-      setHasSearched(true);
       if (res.data) {
         toast.success(`تم استدعاء ${res.data.length} حركة بنجاح`);
       }
     }
+    setHasSearched(true);
     setIsFetching(false);
   };
 
   const filteredRecords = records.filter(
     (record) =>
       record.empName.toLowerCase().includes(liveSearchQuery.toLowerCase()) ||
+      (record.notes && record.notes.toLowerCase().includes(liveSearchQuery.toLowerCase())) ||
       formatDate(record.date).includes(liveSearchQuery)
   );
 
@@ -80,12 +80,13 @@ export default function DetailedLogPage() {
             <Database className="text-blue-600" /> سجل الحركات التفصيلي
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-bold">
-            استعرض حضور وانصراف الموظفين مع السلف والمستحقات
+            استعرض حضور وانصراف الموظفين مع السلف والمستحقات والرصيد السابق
           </p>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      {/* ... Filter Controls ... */}
+       <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         <div className="space-y-2">
           <label className="text-xs font-bold text-slate-500 dark:text-slate-400">الموظف</label>
           {loadingInitial ? (
@@ -136,6 +137,7 @@ export default function DetailedLogPage() {
         </button>
       </div>
 
+
       {!hasSearched ? (
         <div className="bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[40vh]">
           <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 w-20 h-20 rounded-full flex items-center justify-center mb-4">
@@ -145,6 +147,11 @@ export default function DetailedLogPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400 font-bold max-w-sm">
             حدد الموظف أو التاريخ من الفلاتر بالأعلى واضغط على \'استدعاء السجلات\' لعرض التقرير التفصيلي.
           </p>
+        </div>
+      ) : isFetching ? (
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[40vh]">
+            <Loader2 size={48} className="text-blue-500 animate-spin mb-4" />
+            <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">جارٍ حساب الأرصدة...</h3>
         </div>
       ) : records.length === 0 ? (
         <div className="bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[40vh]">
@@ -157,11 +164,11 @@ export default function DetailedLogPage() {
       ) : (
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-            <div className="relative">
+             <div className="relative">
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 type="text"
-                placeholder="بحث سريع داخل النتائج بالاسم أو التاريخ..."
+                placeholder="بحث سريع داخل النتائج بالاسم أو الملاحظات أو التاريخ..."
                 value={liveSearchQuery}
                 onChange={(e) => setLiveSearchQuery(e.target.value)}
                 className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl h-12 pr-12 pl-4 outline-none focus:border-blue-500 font-bold text-sm text-slate-700 dark:text-slate-200 transition-all shadow-sm"
@@ -178,18 +185,34 @@ export default function DetailedLogPage() {
                   <th className="p-4 text-center">البيان</th>
                   <th className="p-4 text-center">له</th>
                   <th className="p-4 text-center">عليه</th>
-                  <th className="p-4 text-center text-amber-600 dark:text-amber-400">الرصيد التراكمي</th>
-                  <th className="p-4 text-center">ملاحظات</th>
+                  <th className="p-4 text-center text-amber-600 dark:text-amber-400">الرصيد</th>
+                  <th className="p-4">ملاحظات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold text-slate-700 dark:text-slate-300">
                 {filteredRecords.map((record) => {
+                  if (record.type === 'OPENING_BALANCE') {
+                     return (
+                      <tr key={record.id} className="bg-gray-100 dark:bg-gray-800/50 font-black text-gray-600 dark:text-gray-300">
+                        <td className="p-4">{record.empName}</td>
+                        <td className="p-4 text-center">-</td>
+                        <td className="p-4 text-center flex items-center justify-center gap-2">
+                           <Scale size={16} /> رصيد سابق
+                        </td>
+                        <td className="p-4 text-center">-</td>
+                        <td className="p-4 text-center">-</td>
+                        <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
+                        <td className="p-4 text-xs italic max-w-[250px] truncate">{record.notes}</td>
+                      </tr>
+                    );
+                  }
+                  
                   if (record.type === 'CASH') {
                     return (
                       <tr key={`cash-${record.id}`} className="bg-red-50/50 dark:bg-red-900/10 hover:bg-red-50/80">
                         <td className="p-4">{record.empName}</td>
                         <td className="p-4 text-center">{formatTime(record.date)} <span className="text-slate-400 font-normal text-xs">({formatDate(record.date)})</span></td>
-                        <td className="p-4 text-center font-black flex items-center justify-center gap-2">
+                        <td className="p-4 text-center font-bold flex items-center justify-center gap-2">
                            <ArrowUp className="text-red-500" size={16} /> سلفة نقدية
                         </td>
                         <td className="p-4 text-center text-slate-500">-</td>
@@ -200,7 +223,6 @@ export default function DetailedLogPage() {
                     );
                   }
 
-                  // Default is ATTENDANCE
                   return (
                     <tr key={`att-${record.id}`} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
                        <td className="p-4">{record.empName}</td>
@@ -224,7 +246,7 @@ export default function DetailedLogPage() {
                        <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">
                         {record.deficit !== '-' && <span className="text-red-500">عجز: {record.deficit} س</span>}
                         {record.overtime !== '-' && <span className="text-green-500 ml-2">إضافي: {record.overtime} س</span>}
-                        {record.isLastOfDay && <span> (إجمالي العمل: {record.actualHrs} س)</span>}
+                         {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}
                        </td>
                     </tr>
                   );
@@ -243,4 +265,3 @@ export default function DetailedLogPage() {
     </div>
   );
 }
-
