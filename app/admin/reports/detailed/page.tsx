@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { getEmployeesList, getDetailedLog } from '@/app/actions/reports';
-import { Search, Filter, Calendar, Loader2, Database, AlertCircle, DollarSign, Clock, ArrowUp, ArrowDown, Scale } from 'lucide-react';
+import { Search, Filter, Calendar, Loader2, Database, AlertCircle, DollarSign, Clock, ArrowUp, ArrowDown, Scale, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import EditAttendanceModal from './EditAttendanceModal';
+import EditCashTransactionModal from './EditCashTransactionModal';
+import { deleteAttendanceAction, deleteCashTransactionAction } from './actions';
 
 const formatTime = (dateString: string | null) => {
   if (!dateString) return '--:--';
@@ -29,6 +32,7 @@ export default function DetailedLogPage() {
   const [hasSearched, setHasSearched] = useState(false);
 
   const [liveSearchQuery, setLiveSearchQuery] = useState('');
+  const [editingRecord, setEditingRecord] = useState<any | null>(null);
 
   useEffect(() => {
     async function loadEmps() {
@@ -63,6 +67,33 @@ export default function DetailedLogPage() {
     }
     setHasSearched(true);
     setIsFetching(false);
+  };
+
+  const handleDelete = async (record: any) => {
+    const confirmed = confirm('هل أنت متأكد من الحذف؟ هذا الإجراء لا يمكن التراجع عنه.');
+  
+    if (!confirmed) return;
+  
+    const toastId = toast.loading('جارٍ الحذف...');
+  
+    try {
+      const result =
+        record.type === 'CASH'
+          ? await deleteCashTransactionAction(record.id)
+          : await deleteAttendanceAction(record.id);
+  
+      if (result.success) {
+        toast.success(result.success, { id: toastId });
+  
+        // Refresh data after deletion
+        handleFetchData();
+
+      } else {
+        toast.error(result.error || 'حدث خطأ غير متوقع', { id: toastId });
+      }
+    } catch (error) {
+      toast.error('فشل في تنفيذ عملية الحذف', { id: toastId });
+    }
   };
 
   const filteredRecords = records.filter(
@@ -187,6 +218,7 @@ export default function DetailedLogPage() {
                   <th className="p-4 text-center">عليه</th>
                   <th className="p-4 text-center text-amber-600 dark:text-amber-400">الرصيد</th>
                   <th className="p-4">ملاحظات</th>
+                  <th className="p-4 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold text-slate-700 dark:text-slate-300">
@@ -203,6 +235,7 @@ export default function DetailedLogPage() {
                         <td className="p-4 text-center">-</td>
                         <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
                         <td className="p-4 text-xs italic max-w-[250px] truncate">{record.notes}</td>
+                         <td className="p-4 text-center">-</td>
                       </tr>
                     );
                   }
@@ -219,6 +252,12 @@ export default function DetailedLogPage() {
                         <td className="p-4 text-center text-red-500 font-black">{record.amount?.toFixed(2) || '0.00'}</td>
                         <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
                         <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes || "-"}</td>
+                        <td className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => setEditingRecord(record)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>
+                                <button onClick={() => handleDelete(record)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
+                            </div>
+                        </td>
                       </tr>
                     );
                   }
@@ -244,10 +283,17 @@ export default function DetailedLogPage() {
                          {record.isLastOfDay ? record.balance : '-'}
                         </td>
                        <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">
+                        {record.notes && <p className="font-bold text-slate-600 dark:text-slate-300">{record.notes}</p>}
                         {record.deficit !== '-' && <span className="text-red-500">عجز: {record.deficit} س</span>}
                         {record.overtime !== '-' && <span className="text-green-500 ml-2">إضافي: {record.overtime} س</span>}
                          {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}
                        </td>
+                        <td className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => setEditingRecord(record)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>
+                                <button onClick={() => handleDelete(record)} className="text-red-500 hover:text-red-700"><Trash2 size={18} /></button>
+                            </div>
+                        </td>
                     </tr>
                   );
                 })}
@@ -262,6 +308,28 @@ export default function DetailedLogPage() {
           </div>
         </div>
       )}
+
+        {/* Modals for Editing */}
+        {editingRecord && editingRecord.type === 'CASH' && (
+        <EditCashTransactionModal
+            record={editingRecord}
+            onClose={() => {
+            setEditingRecord(null);
+            handleFetchData(); // Refetch data after edit
+            }}
+        />
+        )}
+
+        {editingRecord && editingRecord.type !== 'CASH' && editingRecord.type !== 'OPENING_BALANCE' && (
+        <EditAttendanceModal
+            record={editingRecord}
+            onClose={() => {
+            setEditingRecord(null);
+            handleFetchData(); // Refetch data after edit
+            }}
+        />
+        )}
+
     </div>
   );
 }

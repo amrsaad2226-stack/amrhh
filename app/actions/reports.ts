@@ -1,6 +1,6 @@
 
 "use server";
-import prisma from "@/lib/db"; 
+import prisma from "../../lib/db";
 
 export async function getEmployeesList() {
   try {
@@ -19,7 +19,6 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
     const eDate = new Date(endDate);
     eDate.setHours(23, 59, 59, 999); 
 
-    // --- 1. PREVIOUS BALANCE CALCULATION ---
     const openingBalances: Record<string, number> = {};
     const prevWhereClause: any = { date: { lt: sDate } };
     const prevCashWhere: any = { createdAt: { lt: sDate }, type: 'OUTCOME' };
@@ -75,7 +74,6 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
       openingBalances[id] = earnings - advances;
     }
 
-    // --- 2. CURRENT PERIOD DATA ---
     const whereClause: any = { date: { gte: sDate, lte: eDate } };
     if (empId) whereClause.employeeId = Number(empId);
 
@@ -92,7 +90,6 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
         orderBy: [{ employeeId: "asc" }, { createdAt: 'asc' }],
     });
 
-    // --- 3. COMBINE AND PROCESS --- 
     const dailyTotals: Record<string, number> = {};
     records.forEach(r => {
       const dateStr = r.date.toISOString().split('T')[0];
@@ -140,11 +137,11 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
         overtime = ovt > 0 ? ovt.toFixed(2) : "-";
         dailyEarned = totalDayHrs * hourlyRate;
       }
-      return { id: record.id, employeeId: record.employeeId, type: 'ATTENDANCE', empName: record.employee.name, date: record.date.toISOString(), checkIn: record.checkIn ? record.checkIn.toISOString() : null, checkOut: record.checkOut ? record.checkOut.toISOString() : null, actualHrs: accumulatedDayHours.toFixed(2), deficit, overtime, isLastOfDay, dailyEarned, amount: null, notes: null, balance: "-" };
+      return { id: record.id, employeeId: record.employeeId, type: 'ATTENDANCE', empName: record.employee.name, date: record.date.toISOString(), checkIn: record.checkIn ? record.checkIn.toISOString() : null, checkOut: record.checkOut ? record.checkOut.toISOString() : null, actualHrs: accumulatedDayHours.toFixed(2), deficit, overtime, isLastOfDay, dailyEarned, amount: null, notes: record.notes || null, balance: "-" };
     });
 
     const cashData = cashTransactions.filter(t => t.employee).map(t => ({
-        id: t.id, employeeId: t.employeeId, type: 'CASH', empName: t.employee!.name, date: t.createdAt.toISOString(), checkIn: null, checkOut: null, actualHrs: '-', deficit: '-', overtime: '-', isLastOfDay: false, dailyEarned: 0, amount: t.amount, notes: (t as any).notes || null, balance: '-', 
+        id: t.id, employeeId: t.employeeId, type: 'CASH', empName: t.employee!.name, date: t.createdAt.toISOString(), checkIn: null, checkOut: null, actualHrs: '-', deficit: '-', overtime: '-', isLastOfDay: false, dailyEarned: 0, amount: t.amount, notes: t.note || null, balance: '-', 
     }));
     
     const combinedData: any[] = [...attendanceData, ...cashData];
@@ -153,7 +150,6 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
         return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
-    // --- 4. FINAL PASS with Opening Balance ---
     let finalData: any[] = [];
     let cumulativeBalance = 0;
     currentEmpId = -1;
@@ -168,7 +164,6 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
             const openingBalance = openingBalances[currentEmpId] || 0;
             cumulativeBalance = openingBalance;
 
-            // Add opening balance row only if it's not zero
             if (openingBalance !== 0) {
                 finalData.push({
                     id: `ob-${currentEmpId}`,
@@ -196,69 +191,5 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
   } catch (error: any) {
     console.error("Fetch error:", error);
     return { error: "حدث خطأ أثناء جلب البيانات: " + error.message };
-  }
-}
-
-// ... (rest of the file is unchanged)
-
-
-// دالة حذف سجل الحضور
-export async function deleteAttendanceRecord(id: number) {
-  try {
-    await prisma.attendance.delete({ where: { id } });
-    return { success: true };
-  } catch (error) {
-    return { error: "حدث خطأ أثناء حذف السجل" };
-  }
-}
-
-// دالة تعديل وقت الحضور والانصراف
-export async function updateAttendanceRecord(id: number, checkInTime: string | null, checkOutTime: string | null) {
-  try {
-    const existing = await prisma.attendance.findUnique({
-      where: { id },
-      include: { employee: true }
-    });
-
-    if (!existing) return { error: "السجل غير موجود" };
-
-    let newCheckIn = existing.checkIn;
-    let newCheckOut = existing.checkOut;
-
-    const applyTime = (baseDate: Date, timeStr: string) => {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      const newDate = new Date(baseDate);
-      newDate.setHours(hours, minutes, 0, 0);
-      return newDate;
-    };
-
-    if (checkInTime) newCheckIn = applyTime(existing.date, checkInTime);
-    if (checkOutTime) newCheckOut = applyTime(existing.date, checkOutTime);
-
-    let duration = 0;
-    let overtime = 0;
-    if (newCheckIn && newCheckOut) {
-      duration = (newCheckOut.getTime() - newCheckIn.getTime()) / (1000 * 60 * 60);
-      if (duration < 0) duration += 24; 
-      
-      const requiredHours = existing.requiredHours || existing.employee.dailyHours || 10;
-      if (duration > requiredHours) {
-        overtime = duration - requiredHours;
-      }
-    }
-
-    await prisma.attendance.update({
-      where: { id },
-      data: {
-        checkIn: newCheckIn,
-        checkOut: newCheckOut,
-        duration: duration,
-        overtime: overtime
-      }
-    });
-
-    return { success: true };
-  } catch (error) {
-    return { error: "حدث خطأ أثناء تعديل السجل" };
   }
 }

@@ -57,6 +57,8 @@ model Attendance {
   checkIn       DateTime? 
   checkOut      DateTime? 
   
+  notes         String?  // Added this field
+
   latIn         Float?
   lngIn         Float?
   latOut        Float?
@@ -101,6 +103,7 @@ model CashTransaction {
   type        CashType
   amount      Float
   note        String?
+  date        DateTime? // Added this field
 
   employeeId  Int?
   employee    Employee? @relation(fields: [employeeId], references: [id])
