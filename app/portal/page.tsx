@@ -51,18 +51,10 @@ export default async function EmployeePortal() {
   const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;
 
-  let totalHoursWorked = 0;
-  const rightNow = new Date();
+  const totalHoursWorked = processedAttendance.reduce((total, record) => {
+    return total + (record.duration || 0);
+  }, 0);
 
-  processedAttendance.forEach(record => {
-    if (record.checkIn && record.checkOut) {
-      const hrs = (record.checkOut.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
-      totalHoursWorked += Math.max(0, hrs);
-    } else if (record.checkIn && !record.checkOut) {
-      const hrs = (rightNow.getTime() - record.checkIn.getTime()) / (1000 * 60 * 60);
-      totalHoursWorked += Math.max(0, hrs);
-    }
-  });
 
   let currentTotalSalary = 0;
   const lastRecordWithBalance = [...processedAttendance].reverse().find(
