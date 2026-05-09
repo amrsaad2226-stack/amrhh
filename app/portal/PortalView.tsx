@@ -17,17 +17,17 @@ const LeaveStatusBadge = ({ status }: { status: string }) => {
     Pending: {
       icon: <Clock size={14} className="ml-1" />, 
       text: 'قيد المراجعة', 
-      className: 'bg-amber-100 text-amber-700'
+      className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
     },
     Approved: {
       icon: <CheckCircle size={14} className="ml-1" />,
       text: 'موافق عليه',
-      className: 'bg-green-100 text-green-700'
+      className: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400'
     },
     Rejected: {
       icon: <XCircle size={14} className="ml-1" />,
       text: 'مرفوض',
-      className: 'bg-red-100 text-red-700'
+      className: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400'
     },
   };
 
@@ -299,7 +299,7 @@ export default function PortalView({
                     )}
                   </div>
                 </div>
-              ))
+              ))}
           </div>
         ) : (
           <div className="text-center py-10 px-6 bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
