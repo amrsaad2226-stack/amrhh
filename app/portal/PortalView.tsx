@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { getDeviceId } from "@/lib/device";
 import PunchButtons from "./PunchButtons";
 import SalaryDashboard from "./_components/SalaryDashboard";
-import LeaveRequestForm from './_components/LeaveRequestForm'; // Import the form
-import { History, Download, Archive, ChevronLeft } from "lucide-react";
+import LeaveRequestForm from './_components/LeaveRequestForm';
+import { History, Download, Archive, ChevronLeft, Calendar } from "lucide-react";
 
 const formatTime = (dateString: string | null) => {
   if (!dateString) return "--:--";
@@ -141,7 +141,6 @@ export default function PortalView({
 
       <PunchButtons employeeCode={employee.code} isCurrentlyIn={isCurrentlyIn} />
 
-      {/* Leave Request Form Added Back - Fixed prop */}
       <LeaveRequestForm employeeId={employee.id} />
 
       <div className="pt-4">
@@ -165,19 +164,97 @@ export default function PortalView({
         </div>
 
         {attendanceRecords && attendanceRecords.length > 0 ? (
-            <div className="relative space-y-6 before:absolute before:inset-0 before:mr-5 before:-ml-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-500 before:to-transparent before:opacity-20">
+          <div className="relative space-y-6 before:absolute before:inset-0 before:mr-5 before:-ml-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-blue-500 before:to-transparent before:opacity-20">
             {[...attendanceRecords].reverse().map((record: any) => (
                 <div key={record.id} className="relative flex gap-4 group">
                   <div className="absolute right-0 translate-x-1/2 mt-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow-sm z-10 dark:border-slate-900"></div>
+
                   <div className="mr-8 flex-1 bg-white dark:bg-slate-900 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-all hover:-translate-y-1">
-                     {/* Record details rendered here */}
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200">
+                          {new Date(record.date).toLocaleDateString('ar-EG', { weekday: 'long' })}
+                        </h4>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">
+                          {new Date(record.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
+                        </p>
+                      </div>
+                      <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
+                        record.checkOut 
+                          ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400' 
+                          : 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 animate-pulse'
+                      }`}>
+                        {record.checkOut ? 'مكتمل' : 'جاري العمل'}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
+                      <div className="flex items-center gap-1.5">
+                         <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                         {formatTime(record.checkIn)}
+                      </div>
+                      <ChevronLeft size={14} className="text-slate-300" />
+                      <div className="flex items-center gap-1.5">
+                         <div className={`w-1.5 h-1.5 rounded-full ${record.checkOut ? 'bg-red-500' : 'bg-slate-300'}`}></div>
+                         {formatTime(record.checkOut)}
+                      </div>
+                    </div>
+                    
+                    {(record.isLastOfDay && record.checkOut) && (
+                      <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-x-1 gap-y-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+                        
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">ساعات العمل</span>
+                          <span className="text-sm font-black text-blue-600 dark:text-blue-400 mt-1 block">
+                            {record.actualHrs}
+                          </span>
+                        </div>
+                        
+                        <div className="text-center">
+                           <span className="text-xs font-bold text-slate-400 block">عجز</span>
+                           <span className={`text-sm font-black mt-1 block ${record.deficit !== '-' ? 'text-red-500' : 'text-slate-400'}`}>
+                              {record.deficit}
+                           </span>
+                        </div>
+
+                        <div className="text-center">
+                           <span className="text-xs font-bold text-slate-400 block">إضافي</span>
+                           <span className={`text-sm font-black mt-1 block ${record.overtime !== '-' ? 'text-green-600' : 'text-slate-400'}`}>
+                              {record.overtime}
+                           </span>
+                        </div>
+
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">سلف</span>
+                          <span className={`text-sm font-black mt-1 block ${record.dailyAdvance !== '-' ? 'text-orange-500' : 'text-slate-400'}`}>
+                            {record.dailyAdvance !== '-' ? `${record.dailyAdvance} ج` : '-'}
+                          </span>
+                        </div>
+
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">صافي اليوم</span>
+                          <span className={`text-sm font-black mt-1 block ${record.netDailyPay !== '-' ? 'text-green-600' : 'text-slate-400'}`}>
+                            {record.netDailyPay !== '-' ? `${record.netDailyPay} ج` : '-'}
+                          </span>
+                        </div>
+
+                        <div className="text-center">
+                          <span className="text-xs font-bold text-slate-400 block">رصيد تراكمي</span>
+                          <span className="text-base font-black text-slate-800 dark:text-slate-200 mt-1 block">
+                            {record.balance !== '-' ? `${record.balance} ج` : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-            ))}
-            </div>
+              ))}
+          </div>
         ) : (
           <div className="text-center py-10 px-6 bg-slate-50 dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
+             <Calendar size={40} className="mx-auto text-slate-300 mb-3" />
              <p className="text-slate-400 font-bold">لا توجد سجلات لهذا الأسبوع</p>
+             <p className="text-xs text-slate-300 mt-1">ابدأ بتسجيل حضورك الآن!</p>
           </div>
         )}
       </div>
