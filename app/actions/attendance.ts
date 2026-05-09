@@ -195,6 +195,16 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
     }
     dailyTotals[key] += hrs;
   });
+  
+  const openDays = new Set<string>();
+  records.forEach((r) => {
+    if (!r.checkOut) {
+      const dateStr = r.date.toISOString().split("T")[0];
+      const key = `${r.employeeId}_${dateStr}`;
+      openDays.add(key);
+    }
+  });
+
 
   let cumulativeBalance = initialBalance;
   let currentDayStr = "";
@@ -230,8 +240,11 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
     let dailyAdvance = "-";
     let netDailyPay = "-";
 
-    if (isLastOfDay && record.checkOut) {
-      const totalDayHrs = dailyTotals[`${record.employeeId}_${dateStr}`] || 0;
+    const dayKey = `${record.employeeId}_${dateStr}`;
+    const isDayFullyClosed = !openDays.has(dayKey);
+
+    if (isLastOfDay && isDayFullyClosed) {
+      const totalDayHrs = dailyTotals[dayKey] || 0;
       const def = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
       const ovt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
 
@@ -250,6 +263,7 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
     } else if (!record.checkOut) {
       deficit = "مفتوح";
     }
+
 
     return {
       ...record,
