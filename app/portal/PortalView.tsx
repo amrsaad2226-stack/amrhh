@@ -66,7 +66,7 @@ export default function PortalView({
   const [deviceId, setDeviceId] = useState<string>("");
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLeaveHistoryOpen, setLeaveHistoryOpen] = useState(false);
-  const [isActivityLogOpen, setActivityLogOpen] = useState(true);
+  const [isActivityLogOpen, setActivityLogOpen] = useState(false);
 
   useEffect(() => {
     setDeviceId(getDeviceId());
