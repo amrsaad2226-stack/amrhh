@@ -47,14 +47,24 @@ export async function updateAttendanceAction(data: UpdateAttendanceData) {
             }
         }
 
+        const updateData: {
+            checkIn: Date | null;
+            checkOut: Date | null;
+            notes: string;
+            duration?: number;
+        } = {
+            checkIn: data.checkIn,
+            checkOut: data.checkOut,
+            notes: data.notes,
+        };
+
+        if (duration !== null) {
+            updateData.duration = duration;
+        }
+
         await prisma.attendance.update({
             where: { id: data.id },
-            data: {
-                checkIn: data.checkIn,
-                checkOut: data.checkOut,
-                notes: data.notes, // This is now correct because we added 'notes' to the schema
-                duration: duration,
-            },
+            data: updateData,
         });
 
         revalidatePath('/admin/reports/detailed');
