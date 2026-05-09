@@ -50,23 +50,33 @@ export default function DetailedLogPage() {
 
   const handleFetchData = async () => {
     if (!startDate || !endDate) {
-      return toast.error('يرجى تحديد تاريخ البداية والنهاية');
+        return toast.error('يرجى تحديد تاريخ البداية والنهاية');
     }
 
     setIsFetching(true);
-    const res = await getDetailedLog(selectedEmpId, startDate, endDate);
+    try {
+        const res = await getDetailedLog(selectedEmpId, startDate, endDate);
 
-    if (res.error) {
-      toast.error(res.error);
-      setRecords([]);
-    } else {
-      setRecords(res.data || []);
-      if (res.data) {
-        toast.success(`تم استدعاء ${res.data.length} حركة بنجاح`);
-      }
+        if (res?.error) {
+            toast.error(res.error);
+            setRecords([]);
+        } else if (res?.data) {
+            setRecords(res.data);
+            if (res.data.length > 0) {
+                toast.success(`تم استدعاء ${res.data.length} حركة بنجاح`);
+            }
+        } else {
+            toast.error("حدث خطأ غير متوقع أثناء جلب البيانات");
+            setRecords([]);
+        }
+    } catch (error) {
+        console.error("Fetch error:", error);
+        toast.error("فشل الاتصال بالخادم. يرجى المحاولة مرة أخرى.");
+        setRecords([]);
+    } finally {
+        setHasSearched(true);
+        setIsFetching(false);
     }
-    setHasSearched(true);
-    setIsFetching(false);
   };
 
   const handleDelete = async (record: any) => {
