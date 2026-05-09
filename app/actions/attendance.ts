@@ -53,14 +53,25 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
       where: { 
         employeeId: employee.id, 
         checkOut: null 
-      }
+      },
+      orderBy: { checkIn: 'desc' }
     });
 
-    if (activeSession) {
-      return { error: "أنت مسجل حضور بالفعل! يجب تسجيل الانصراف أولاً." };
-    }
-
     const now = getCurrentCairoTime();
+    
+    if (activeSession) {
+      const sessionCheckInDate = new Date(activeSession.checkIn);
+      const isSameDay = now.getFullYear() === sessionCheckInDate.getFullYear() &&
+                        now.getMonth() === sessionCheckInDate.getMonth() &&
+                        now.getDate() === sessionCheckInDate.getDate();
+
+      if (isSameDay) {
+        return { error: "أنت مسجل حضور بالفعل! يجب تسجيل الانصراف أولاً." };
+      }
+      // If the active session is from a previous day, we allow the user to check in for the new day.
+      // The old session will remain open for admin review.
+    }
+    
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
 
