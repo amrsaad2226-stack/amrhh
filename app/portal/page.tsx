@@ -26,7 +26,6 @@ export default async function EmployeePortal() {
 
   if (!employee) redirect("/login");
 
-  const now = new Date();
   let targetHours: number;
   let periodLabel: string;
 
@@ -46,7 +45,7 @@ export default async function EmployeePortal() {
       break;
   }
 
-  const { records: processedAttendance, previousBalance } = await getEmployeePortalAttendance(empId);
+  const { records: processedAttendance, previousBalance } = await getEmployeePortalAttendance(empId, employee.salaryType);
 
   const lastAttendance = processedAttendance.length > 0 ? processedAttendance[processedAttendance.length - 1] : null;
   const isCurrentlyIn = !!lastAttendance && !lastAttendance.checkOut;

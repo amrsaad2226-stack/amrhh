@@ -1,5 +1,6 @@
 
 "use server";
+import { SalaryType } from "@prisma/client";
 import db from "@/lib/db";
 import { getDistance } from "@/lib/location";
 import { revalidatePath } from "next/cache";
@@ -263,8 +264,6 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
         }
     }
     
-    // The REAL fix: Return the original duration if the day is closed, otherwise return null.
-    // The top counter in the UI sums this `duration` field.
     const finalDuration = isDayFullyClosed ? record.duration : null;
 
     return {
@@ -283,13 +282,34 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
   return { processedRecords, finalBalance: cumulativeBalance };
 }
 
-export async function getEmployeePortalAttendance(empId: number) {
-  
-  const viewStartDate = new Date();
-  viewStartDate.setDate(viewStartDate.getDate() - 7);
-  viewStartDate.setHours(0, 0, 0, 0);
 
-  // --- 1. Calculate Previous Balance from all historical data ---
+export async function getEmployeePortalAttendance(empId: number, salaryType: SalaryType) {
+  
+  const now = new Date();
+  let viewStartDate = new Date(now);
+
+  switch (salaryType) {
+    case SalaryType.DAILY:
+      viewStartDate.setHours(0, 0, 0, 0);
+      break;
+    case SalaryType.WEEKLY:
+      const dayOfWeek = now.getDay(); // Sunday = 0, Saturday = 6
+      const diff = dayOfWeek < 6 ? dayOfWeek + 1 : 0; // Days to subtract to get to last Saturday
+      viewStartDate.setDate(now.getDate() - diff);
+      viewStartDate.setHours(0, 0, 0, 0);
+      break;
+    case SalaryType.MONTHLY:
+      viewStartDate.setDate(1);
+      viewStartDate.setHours(0, 0, 0, 0);
+      break;
+    default:
+      // Fallback to 7 days for any other case, just to be safe
+      viewStartDate.setDate(now.getDate() - 7);
+      viewStartDate.setHours(0, 0, 0, 0);
+      break;
+  }
+
+  // --- 1. Calculate Previous Balance from all historical data before the current period ---
   const historicalRecords = await db.attendance.findMany({
     where: {
       employeeId: empId,
