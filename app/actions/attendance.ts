@@ -212,6 +212,8 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
 
   const processedRecords = records.map((record, index) => {
     const dateStr = record.date.toISOString().split("T")[0];
+    const dayKey = `${record.employeeId}_${dateStr}`;
+    const isDayFullyClosed = !openDays.has(dayKey);
 
     if (currentDayStr !== dateStr) {
       currentDayStr = dateStr;
@@ -228,7 +230,9 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
       if (sessionHours < 0) sessionHours += 24;
     }
 
-    accumulatedDayHours += sessionHours;
+    if (isDayFullyClosed) {
+      accumulatedDayHours += sessionHours;
+    }
 
     const isLastOfDay =
       index === records.length - 1 ||
@@ -239,35 +243,38 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
     let displayBalance = "-";
     let dailyAdvance = "-";
     let netDailyPay = "-";
+    
+    let displayActualHours = "-";
 
-    const dayKey = `${record.employeeId}_${dateStr}`;
-    const isDayFullyClosed = !openDays.has(dayKey);
+    if (isDayFullyClosed) {
+      displayActualHours = accumulatedDayHours > 0 ? accumulatedDayHours.toFixed(2) : (record.checkOut ? "0.00" : "-");
+      if (isLastOfDay) {
+        const totalDayHrs = dailyTotals[dayKey] || 0;
+        const def = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
+        const ovt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
 
-    if (isLastOfDay && isDayFullyClosed) {
-      const totalDayHrs = dailyTotals[dayKey] || 0;
-      const def = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
-      const ovt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
+        deficit = def > 0 ? def.toFixed(2) : "-";
+        overtime = ovt > 0 ? ovt.toFixed(2) : "-";
 
-      deficit = def > 0 ? def.toFixed(2) : "-";
-      overtime = ovt > 0 ? ovt.toFixed(2) : "-";
+        const advanceForDay = dailyAdvances[dateStr] || 0;
+        const dailyEarned = totalDayHrs * hourlyRate;
+        const netPay = dailyEarned - advanceForDay;
 
-      const advanceForDay = dailyAdvances[dateStr] || 0;
-      const dailyEarned = totalDayHrs * hourlyRate;
-      const netPay = dailyEarned - advanceForDay;
-
-      cumulativeBalance += netPay;
-      displayBalance = Math.round(cumulativeBalance).toString();
-      dailyAdvance = advanceForDay > 0 ? advanceForDay.toFixed(2) : "-";
-      netDailyPay = netPay.toFixed(2);
-
-    } else if (!record.checkOut) {
-      deficit = "مفتوح";
+        cumulativeBalance += netPay;
+        displayBalance = Math.round(cumulativeBalance).toString();
+        dailyAdvance = advanceForDay > 0 ? advanceForDay.toFixed(2) : "-";
+        netDailyPay = netPay.toFixed(2);
+      }
+    } else {
+      displayActualHours = record.checkOut ? "-" : "مفتوح";
+      if (isLastOfDay) {
+          deficit = "مفتوح";
+      }
     }
-
 
     return {
       ...record,
-      actualHrs: accumulatedDayHours > 0 ? accumulatedDayHours.toFixed(2) : (record.checkOut ? "0.00" : "-"),
+      actualHrs: displayActualHours,
       deficit,
       overtime,
       balance: displayBalance,
