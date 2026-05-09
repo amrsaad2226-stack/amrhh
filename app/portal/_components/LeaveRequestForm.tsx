@@ -41,7 +41,7 @@ export default function LeaveRequestForm({ employeeId }: { employeeId: number })
             <form action={handleSubmit} className="p-6 flex flex-col gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">نوع الإجازة</label>
-                <select name="type" className="w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none focus:border-blue-500">
+                <select name="type" className="w-full p-3 bg-slate-50 border rounded-xl font-bold outline-none focus:border-blue-500 text-slate-700">
                   <option value="سنوية">سنوية (رصيد)</option>
                   <option value="عارضة">عارضة (طوارئ)</option>
                   <option value="مرضية">مرضية</option>
@@ -52,11 +52,11 @@ export default function LeaveRequestForm({ employeeId }: { employeeId: number })
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">من تاريخ</label>
-                  <input type="date" name="startDate" required className="w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold outline-none" />
+                  <input type="date" name="startDate" required className="w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold outline-none focus:border-blue-500 text-slate-700" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">إلى تاريخ</label>
-                  <input type="date" name="endDate" required className="w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold outline-none" />
+                  <input type="date" name="endDate" required className="w-full p-3 bg-slate-50 border rounded-xl text-sm font-bold outline-none focus:border-blue-500 text-slate-700" />
                 </div>
               </div>
 

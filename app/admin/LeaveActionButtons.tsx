@@ -1,38 +1,45 @@
-"use client";
-import { useState } from "react";
-import { updateLeaveStatus } from "@/app/actions/leaves";
-import { toast } from "sonner";
+'use client';
+import { useState } from 'react';
+import { updateLeaveStatus } from '@/app/actions/leaves';
+import { toast } from 'sonner';
+import { Check, X } from 'lucide-react';
 
 export default function LeaveActionButtons({ leaveId }: { leaveId: number }) {
   const [loading, setLoading] = useState(false);
 
-  const handleUpdate = async (status: "Approved" | "Rejected") => {
+  const handleUpdate = async (status: 'Approved' | 'Rejected') => {
     setLoading(true);
     const res = await updateLeaveStatus(leaveId, status);
-    
+
     if (res?.error) {
       toast.error(res.error);
     } else {
-      toast.success(status === "Approved" ? "✅ تمت الموافقة على الإجازة" : "❌ تم رفض الإجازة");
+      toast.success(
+        status === 'Approved'
+          ? '✅ تمت الموافقة على الإجازة'
+          : '❌ تم رفض الإجازة'
+      );
     }
     setLoading(false);
   };
 
   return (
-    <div className="flex gap-2 mt-4 border-t border-amber-100 pt-4">
-      <button 
-        onClick={() => handleUpdate("Approved")} 
+    <div className="flex gap-2 items-center">
+      <button
+        onClick={() => handleUpdate('Approved')}
         disabled={loading}
-        className="flex-1 bg-green-600 text-white py-2 rounded-xl text-xs font-black hover:bg-green-700 transition-all shadow-md shadow-green-100 active:scale-95"
+        className="bg-green-100 text-green-700 p-2 rounded-full hover:bg-green-200 transition-all active:scale-95 disabled:opacity-50"
+        title="موافقة"
       >
-        موافقة
+        <Check size={18} />
       </button>
-      <button 
-        onClick={() => handleUpdate("Rejected")} 
+      <button
+        onClick={() => handleUpdate('Rejected')}
         disabled={loading}
-        className="flex-1 bg-red-600 text-white py-2 rounded-xl text-xs font-black hover:bg-red-700 transition-all shadow-md shadow-red-100 active:scale-95"
+        className="bg-red-100 text-red-700 p-2 rounded-full hover:bg-red-200 transition-all active:scale-95 disabled:opacity-50"
+        title="رفض"
       >
-        رفض
+        <X size={18} />
       </button>
     </div>
   );
