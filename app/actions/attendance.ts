@@ -59,7 +59,7 @@ export async function checkInAction(code: string, lat: number, lng: number, devi
 
     const now = getCurrentCairoTime();
     
-    if (activeSession) {
+    if (activeSession && activeSession.checkIn) {
       const sessionCheckInDate = new Date(activeSession.checkIn);
       const isSameDay = now.getFullYear() === sessionCheckInDate.getFullYear() &&
                         now.getMonth() === sessionCheckInDate.getMonth() &&
