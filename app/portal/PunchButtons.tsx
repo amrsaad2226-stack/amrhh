@@ -43,8 +43,8 @@ export default function PunchButtons({ employeeCode, isCurrentlyIn: initialIsCur
 
         if (res.error) {
           setMessage({ text: res.error, type: 'error' });
-          // The specific logic to handle the late checkout error
-          if (res.error.includes("تجاوزت عدد الساعات المسموح بها لتسجيل الانصراف")) {
+          // Updated the condition to check for a more stable part of the error message.
+          if (res.error.includes("غالباً نسيت تسجيل الانصراف")) {
             setIsClientCurrentlyIn(false); // Consider the user as checked out for the UI
           }
         } else {
