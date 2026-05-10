@@ -126,6 +126,11 @@ export default function DetailedLogPage() {
   return (
     <>
     <style jsx global>{`
+        @media screen {
+          .printable-area {
+            display: none;
+          }
+        }
         @media print {
           body {
             -webkit-print-color-adjust: exact;
@@ -181,6 +186,70 @@ export default function DetailedLogPage() {
            .dark .text-amber-400 { color: #b45309 !important; }
         }
     `}</style>
+
+    {hasSearched && records.length > 0 && (
+      <div className="printable-area">
+        {Object.values(groupedByEmployee).map((group: any, index) => (
+            <div key={group.employee.id} className={index < Object.values(groupedByEmployee).length - 1 ? 'employee-page' : ''}>
+              <div className="print-header">
+                  <h2>كشف حساب الموظف: {group.employee.name}</h2>
+                  <p>الفترة من: {formatDate(startDate)} إلى: {formatDate(endDate)}</p>
+              </div>
+              <table className="w-full text-sm text-right whitespace-nowrap">
+                <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-black border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="p-4 text-center">التاريخ والوقت</th>
+                    <th className="p-4 text-center">البيان</th>
+                    <th className="p-4 text-center">له</th>
+                    <th className="p-4 text-center">عليه</th>
+                    <th className="p-4 text-center text-amber-600 dark:text-amber-400">الرصيد</th>
+                    <th className="p-4">ملاحظات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold text-slate-700 dark:text-slate-300">
+                  {group.records.map((record: any) => {
+                    if (record.type === 'OPENING_BALANCE') {
+                       return (
+                        <tr key={record.id} className="bg-gray-100 dark:bg-gray-800/50 font-black text-gray-600 dark:text-gray-300">
+                          <td className="p-4 text-center">-</td>
+                          <td className="p-4 text-center flex items-center justify-center gap-2"><Scale size={16} /> رصيد سابق</td>
+                          <td className="p-4 text-center">-</td>
+                          <td className="p-4 text-center">-</td>
+                          <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
+                          <td className="p-4 text-xs italic max-w-[250px] truncate">{record.notes}</td>
+                        </tr>
+                      );
+                    }
+                    if (record.type === 'CASH') {
+                      return (
+                        <tr key={`cash-${record.id}`} className="bg-red-50/50 dark:bg-red-900/10">
+                          <td className="p-4 text-center">{formatTime(record.date)} <span className="text-slate-400 font-normal text-xs">({formatDate(record.date)})</span></td>
+                          <td className="p-4 text-center font-bold flex items-center justify-center gap-2"><ArrowUp className="text-red-500" size={16} /> سلفة نقدية</td>
+                          <td className="p-4 text-center text-slate-500">-</td>
+                          <td className="p-4 text-center text-red-500 font-black">{record.amount?.toFixed(2) || '0.00'}</td>
+                          <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
+                          <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes || "-"}</td>
+                        </tr>
+                      );
+                    }
+                    return (
+                      <tr key={`att-${record.id}`}>
+                         <td className="p-4 text-center">{formatTime(record.checkIn)}{record.checkOut && <span className="mx-1 text-slate-400">-</span>}{formatTime(record.checkOut)} <span className="text-slate-400 font-normal text-xs"> ({formatDate(record.date)})</span></td>
+                         <td className="p-4 text-center flex items-center justify-center gap-2"><Clock size={16} className="text-blue-500" /> حركة حضور</td>
+                         <td className="p-4 text-center text-green-500 font-black">{record.isLastOfDay ? record.dailyEarned.toFixed(2) : '-'}</td>
+                         <td className="p-4 text-center text-slate-500">-</td>
+                         <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.isLastOfDay ? record.balance : '-'}</td>
+                         <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes && <p className="font-bold text-slate-600 dark:text-slate-300">{record.notes}</p>}{record.deficit !== '-' && <span className="text-red-500">عجز: {record.deficit} س</span>}{record.overtime !== '-' && <span className="text-green-500 ml-2">إضافي: {record.overtime} س</span>} {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+        ))}
+      </div>
+    )}
+    
     <div className="p-4 md:p-8 space-y-6 no-print" dir="rtl">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
         <div>
@@ -288,67 +357,6 @@ export default function DetailedLogPage() {
                 className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl h-12 pr-12 pl-4 outline-none focus:border-blue-500 font-bold text-sm text-slate-700 dark:text-slate-200 transition-all shadow-sm"
               />
             </div>
-          </div>
-
-          <div className="overflow-x-auto hidden printable-area">
-            {Object.values(groupedByEmployee).map((group: any, index) => (
-                <div key={group.employee.id} className={index < Object.values(groupedByEmployee).length - 1 ? 'employee-page' : ''}>
-                  <div className="print-header">
-                      <h2>كشف حساب الموظف: {group.employee.name}</h2>
-                      <p>الفترة من: {formatDate(startDate)} إلى: {formatDate(endDate)}</p>
-                  </div>
-                  <table className="w-full text-sm text-right whitespace-nowrap">
-                    <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-black border-b border-slate-200 dark:border-slate-800">
-                      <tr>
-                        <th className="p-4 text-center">التاريخ والوقت</th>
-                        <th className="p-4 text-center">البيان</th>
-                        <th className="p-4 text-center">له</th>
-                        <th className="p-4 text-center">عليه</th>
-                        <th className="p-4 text-center text-amber-600 dark:text-amber-400">الرصيد</th>
-                        <th className="p-4">ملاحظات</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold text-slate-700 dark:text-slate-300">
-                      {group.records.map((record: any) => {
-                        if (record.type === 'OPENING_BALANCE') {
-                           return (
-                            <tr key={record.id} className="bg-gray-100 dark:bg-gray-800/50 font-black text-gray-600 dark:text-gray-300">
-                              <td className="p-4 text-center">-</td>
-                              <td className="p-4 text-center flex items-center justify-center gap-2"><Scale size={16} /> رصيد سابق</td>
-                              <td className="p-4 text-center">-</td>
-                              <td className="p-4 text-center">-</td>
-                              <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
-                              <td className="p-4 text-xs italic max-w-[250px] truncate">{record.notes}</td>
-                            </tr>
-                          );
-                        }
-                        if (record.type === 'CASH') {
-                          return (
-                            <tr key={`cash-${record.id}`} className="bg-red-50/50 dark:bg-red-900/10">
-                              <td className="p-4 text-center">{formatTime(record.date)} <span className="text-slate-400 font-normal text-xs">({formatDate(record.date)})</span></td>
-                              <td className="p-4 text-center font-bold flex items-center justify-center gap-2"><ArrowUp className="text-red-500" size={16} /> سلفة نقدية</td>
-                              <td className="p-4 text-center text-slate-500">-</td>
-                              <td className="p-4 text-center text-red-500 font-black">{record.amount?.toFixed(2) || '0.00'}</td>
-                              <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.balance}</td>
-                              <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes || "-"}</td>
-                            </tr>
-                          );
-                        }
-                        return (
-                          <tr key={`att-${record.id}`}>
-                             <td className="p-4 text-center">{formatTime(record.checkIn)}{record.checkOut && <span className="mx-1 text-slate-400">-</span>}{formatTime(record.checkOut)} <span className="text-slate-400 font-normal text-xs"> ({formatDate(record.date)})</span></td>
-                             <td className="p-4 text-center flex items-center justify-center gap-2"><Clock size={16} className="text-blue-500" /> حركة حضور</td>
-                             <td className="p-4 text-center text-green-500 font-black">{record.isLastOfDay ? record.dailyEarned.toFixed(2) : '-'}</td>
-                             <td className="p-4 text-center text-slate-500">-</td>
-                             <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.isLastOfDay ? record.balance : '-'}</td>
-                             <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes && <p className="font-bold text-slate-600 dark:text-slate-300">{record.notes}</p>}{record.deficit !== '-' && <span className="text-red-500">عجز: {record.deficit} س</span>}{record.overtime !== '-' && <span className="text-green-500 ml-2">إضافي: {record.overtime} س</span>} {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-            ))}
           </div>
 
           {/* This is the visible table for the screen */}
