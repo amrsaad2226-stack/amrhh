@@ -244,6 +244,15 @@ export default function DetailedLogPage() {
                     );
                   })}
                 </tbody>
+                {group.records.length > 0 && (
+                    <tfoot className="border-t-4 border-double border-slate-300">
+                        <tr>
+                            <td colSpan={4} className="p-4 font-black text-left">الرصيد النهائي للموظف:</td>
+                            <td className="p-4 text-center font-mono font-black text-xl">{group.records[group.records.length - 1].balance}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                )}
               </table>
             </div>
         ))}
@@ -428,6 +437,17 @@ export default function DetailedLogPage() {
                     );
                   })}
                 </tbody>
+                {selectedEmpId && records.length > 0 && (
+                  <tfoot className="bg-slate-100 dark:bg-slate-950 border-t-2 border-blue-200 dark:border-blue-900">
+                    <tr>
+                      <td colSpan={5} className="p-4 font-black text-right">الرصيد النهائي للموظف:</td>
+                      <td className="p-4 font-mono font-black text-center text-lg text-amber-600 dark:text-amber-400">
+                        {records[records.length - 1].balance}
+                      </td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                )}
             </table>
              {filteredRecords.length === 0 && records.length > 0 && (
               <div className="p-8 text-center text-slate-500 font-bold">
