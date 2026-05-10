@@ -36,9 +36,15 @@ export default function DetailedLogPage() {
 
   useEffect(() => {
     async function loadEmps() {
-      const data = await getEmployeesList();
-      setEmployees(data);
-      setLoadingInitial(false);
+      try {
+        const data = await getEmployeesList();
+        setEmployees(data || []);
+      } catch (error) {
+        toast.error("فشل تحميل قائمة الموظفين");
+        setEmployees([]);
+      } finally {
+        setLoadingInitial(false);
+      }
 
       const today = new Date();
       const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -108,9 +114,11 @@ export default function DetailedLogPage() {
 
   const filteredRecords = records.filter(
     (record) =>
-      record.empName.toLowerCase().includes(liveSearchQuery.toLowerCase()) ||
-      (record.notes && record.notes.toLowerCase().includes(liveSearchQuery.toLowerCase())) ||
-      formatDate(record.date).includes(liveSearchQuery)
+      record && record.employee && (
+        record.employee.name?.toLowerCase().includes(liveSearchQuery.toLowerCase()) ||
+        (record.notes && record.notes.toLowerCase().includes(liveSearchQuery.toLowerCase())) ||
+        formatDate(record.date).includes(liveSearchQuery)
+      )
   );
 
   return (
@@ -139,7 +147,7 @@ export default function DetailedLogPage() {
               className="w-full h-12 px-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 outline-none focus:border-blue-500 transition-all font-bold text-slate-700 dark:text-slate-200"
             >
               <option value="">الكل (جميع الموظفين)</option>
-              {employees.map((emp) => (
+              {employees.filter(Boolean).map((emp) => (
                 <option key={emp.id} value={emp.id}>
                   {emp.name} ({emp.code})
                 </option>
@@ -233,10 +241,11 @@ export default function DetailedLogPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-bold text-slate-700 dark:text-slate-300">
                 {filteredRecords.map((record) => {
+                  if (!record || !record.employee) return null; // Safety check
                   if (record.type === 'OPENING_BALANCE') {
                      return (
                       <tr key={record.id} className="bg-gray-100 dark:bg-gray-800/50 font-black text-gray-600 dark:text-gray-300">
-                        <td className="p-4">{record.empName}</td>
+                        <td className="p-4">{record.employee.name}</td>
                         <td className="p-4 text-center">-</td>
                         <td className="p-4 text-center flex items-center justify-center gap-2">
                            <Scale size={16} /> رصيد سابق
@@ -253,7 +262,7 @@ export default function DetailedLogPage() {
                   if (record.type === 'CASH') {
                     return (
                       <tr key={`cash-${record.id}`} className="bg-red-50/50 dark:bg-red-900/10 hover:bg-red-50/80">
-                        <td className="p-4">{record.empName}</td>
+                        <td className="p-4">{record.employee.name}</td>
                         <td className="p-4 text-center">{formatTime(record.date)} <span className="text-slate-400 font-normal text-xs">({formatDate(record.date)})</span></td>
                         <td className="p-4 text-center font-bold flex items-center justify-center gap-2">
                            <ArrowUp className="text-red-500" size={16} /> سلفة نقدية
@@ -274,7 +283,7 @@ export default function DetailedLogPage() {
 
                   return (
                     <tr key={`att-${record.id}`} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                       <td className="p-4">{record.empName}</td>
+                       <td className="p-4">{record.employee.name}</td>
                        <td className="p-4 text-center">
                         {formatTime(record.checkIn)}
                         {record.checkOut && <span className="mx-1 text-slate-400">-</span>} 

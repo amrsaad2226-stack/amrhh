@@ -41,6 +41,7 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
     if (allPrevAttendances.length > 0) {
         const employeeRates: Record<string, number> = {};
         allPrevAttendances.forEach(att => {
+            if (!att.employee) return;
             if (!employeeRates[att.employeeId]) {
                 const dailyHours = att.employee.dailyHours || 8;
                 const dailySalary = att.employee.dailySalary || 0;
@@ -58,14 +59,16 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
 
     const prevAdvances: Record<string, number> = {};
     allPrevCashTxs.forEach(tx => {
-      if (!tx.employeeId) return;
-      if (!prevAdvances[tx.employeeId]) prevAdvances[tx.employeeId] = 0;
+      if (tx.employeeId == null) return;
+      if (!prevAdvances[tx.employeeId]) {
+        prevAdvances[tx.employeeId] = 0;
+      }
       prevAdvances[tx.employeeId] += tx.amount;
     });
 
     const allPrevEmployeeIds = new Set([
       ...allPrevAttendances.map(a => a.employeeId),
-      ...(allPrevCashTxs.map(c => c.employeeId).filter(id => id !== null) as number[])
+      ...allPrevCashTxs.map(c => c.employeeId).filter((id): id is number => id != null)
     ]);
 
     for (const id of allPrevEmployeeIds) {
@@ -103,7 +106,7 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
       dailyTotals[key] += hrs;
     });
 
-    let currentEmpId = -1;
+    let currentEmpId: number | null = -1;
     let currentDayStr = "";
     let accumulatedDayHours = 0;
 
@@ -137,16 +140,47 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
         overtime = ovt > 0 ? ovt.toFixed(2) : "-";
         dailyEarned = totalDayHrs * hourlyRate;
       }
-      return { id: record.id, employeeId: record.employeeId, type: 'ATTENDANCE', empName: record.employee.name, date: record.date.toISOString(), checkIn: record.checkIn ? record.checkIn.toISOString() : null, checkOut: record.checkOut ? record.checkOut.toISOString() : null, actualHrs: accumulatedDayHours.toFixed(2), deficit, overtime, isLastOfDay, dailyEarned, amount: null, notes: record.notes || null, balance: "-" };
+      return { 
+        id: record.id, 
+        employee: { id: record.employeeId, name: record.employee.name },
+        type: 'ATTENDANCE', 
+        date: record.date.toISOString(), 
+        checkIn: record.checkIn ? record.checkIn.toISOString() : null, 
+        checkOut: record.checkOut ? record.checkOut.toISOString() : null, 
+        actualHrs: accumulatedDayHours.toFixed(2), 
+        deficit, 
+        overtime, 
+        isLastOfDay, 
+        dailyEarned, 
+        amount: null, 
+        notes: record.notes || null, 
+        balance: "-" 
+      };
     });
 
-    const cashData = cashTransactions.filter(t => t.employee).map(t => ({
-        id: t.id, employeeId: t.employeeId, type: 'CASH', empName: t.employee!.name, date: t.createdAt.toISOString(), checkIn: null, checkOut: null, actualHrs: '-', deficit: '-', overtime: '-', isLastOfDay: false, dailyEarned: 0, amount: t.amount, notes: t.note || null, balance: '-', 
+    const cashData = cashTransactions.filter(t => t.employee && t.employeeId !== null).map(t => ({
+        id: t.id, 
+        employee: { id: t.employeeId!, name: t.employee!.name },
+        type: 'CASH', 
+        date: t.createdAt.toISOString(), 
+        checkIn: null, 
+        checkOut: null, 
+        actualHrs: '-', 
+        deficit: '-', 
+        overtime: '-', 
+        isLastOfDay: false, 
+        dailyEarned: 0, 
+        amount: t.amount, 
+        notes: t.note || null, 
+        balance: '-', 
     }));
     
-    const combinedData: any[] = [...attendanceData, ...cashData];
+    const initialCombinedData: any[] = [...attendanceData, ...cashData];
+    
+    const combinedData = initialCombinedData.filter(item => item && item.employee && item.employee.name);
+
     combinedData.sort((a, b) => {
-        if (a.employeeId !== b.employeeId) return (a.employeeId || 0) - (b.employeeId || 0);
+        if (a.employee.id !== b.employee.id) return (a.employee.id || 0) - (b.employee.id || 0);
         return new Date(a.date).getTime() - new Date(b.date).getTime();
     });
 
@@ -157,19 +191,20 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
     const processedEmployees = new Set();
 
     for (const item of combinedData) {
-        if (!processedEmployees.has(item.employeeId)) {
-            currentEmpId = item.employeeId;
+        if (item.employee.id === null || item.employee.id === undefined) continue;
+
+        if (!processedEmployees.has(item.employee.id)) {
+            currentEmpId = item.employee.id;
             processedEmployees.add(currentEmpId);
             
-            const openingBalance = openingBalances[currentEmpId] || 0;
+            const openingBalance = openingBalances[currentEmpId!] || 0;
             cumulativeBalance = openingBalance;
 
             if (openingBalance !== 0) {
                 finalData.push({
                     id: `ob-${currentEmpId}`,
-                    employeeId: currentEmpId,
+                    employee: { id: currentEmpId, name: item.employee.name },
                     type: 'OPENING_BALANCE',
-                    empName: item.empName,
                     date: sDate.toISOString(),
                     balance: Math.round(openingBalance),
                     notes: 'رصيد سابق من فترة قبل ' + sDate.toLocaleDateString('ar-EG'),
