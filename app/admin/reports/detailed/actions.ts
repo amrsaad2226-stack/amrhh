@@ -99,3 +99,57 @@ export async function updateCashTransactionAction(data: UpdateCashData) {
         return { error: 'فشل تحديث السلفة' };
     }
 }
+
+// --- CREATE ACTION ---
+interface CreateAttendanceData {
+    employeeId: number;
+    date: string;
+    checkIn: string | null;
+    checkOut: string | null;
+    notes: string;
+}
+
+export async function createAttendanceAction(data: CreateAttendanceData) {
+    try {
+        let duration = 0;
+
+        if (data.checkIn && data.checkOut) {
+            const checkInDate = new Date(`${data.date}T${data.checkIn}:00+03:00`);
+            const checkOutDate = new Date(`${data.date}T${data.checkOut}:00+03:00`);
+            duration =
+                (checkOutDate.getTime() - checkInDate.getTime()) /
+                (1000 * 60 * 60);
+
+            if (duration < 0) {
+                duration += 24;
+            }
+        }
+
+        await prisma.attendance.create({
+            data: {
+                employeeId: data.employeeId,
+                date: new Date(data.date),
+                checkIn: data.checkIn
+                    ? new Date(`${data.date}T${data.checkIn}:00+03:00`)
+                    : null,
+                checkOut: data.checkOut
+                    ? new Date(`${data.date}T${data.checkOut}:00+03:00`)
+                    : null,
+                notes: data.notes,
+                duration,
+            },
+        });
+
+        revalidatePath('/admin/reports/detailed');
+
+        return {
+            success: 'تم إضافة حركة الحضور والانصراف بنجاح',
+        };
+    } catch (error) {
+        console.error(error);
+
+        return {
+            error: 'فشل إضافة حركة الحضور والانصراف',
+        };
+    }
+}
