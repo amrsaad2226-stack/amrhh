@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { getEmployeesList, getDetailedLog } from '@/app/actions/reports';
-import { Search, Filter, Calendar, Loader2, Database, AlertCircle, Printer, Edit, Trash2, Scale, Clock, ArrowUp } from 'lucide-react';
+import { Search, Filter, Calendar, Loader2, Database, AlertCircle, Printer, Edit, Trash2, Scale, Clock, ArrowUp, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import EditAttendanceModal from './EditAttendanceModal';
 import EditCashTransactionModal from './EditCashTransactionModal';
 import { deleteAttendanceAction, deleteCashTransactionAction } from './actions';
+import AddAttendanceModal from './AddAttendanceModal';
 
 const formatTime = (dateString: string | null) => {
   if (!dateString) return '--:--';
@@ -29,6 +30,7 @@ export default function DetailedLogPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [liveSearchQuery, setLiveSearchQuery] = useState('');
   const [editingRecord, setEditingRecord] = useState<any | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     async function loadEmps() {
@@ -320,14 +322,23 @@ export default function DetailedLogPage() {
           {isFetching ? <Loader2 size={20} className="animate-spin" /> : <Filter size={20} />}
           استدعاء السجلات
         </button>
-        <button
-          onClick={handlePrint}
-          disabled={isFetching || records.length === 0}
-          className="h-12 bg-gray-700 hover:bg-gray-800 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 shadow-lg shadow-gray-200 dark:shadow-none"
-        >
-           <Printer size={20} />
-           طباعة
-        </button>
+        <div className="flex items-center gap-2">
+            <button
+            onClick={() => setShowAddModal(true)}
+            className="h-12 w-full bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2 active:scale-95 shadow-lg"
+            >
+                <Plus size={20} />
+                إضافة حركة
+            </button>
+            <button
+                onClick={handlePrint}
+                disabled={isFetching || records.length === 0}
+                className="h-12 w-full bg-gray-700 hover:bg-gray-800 text-white rounded-2xl font-black transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 shadow-lg shadow-gray-200 dark:shadow-none"
+            >
+                <Printer size={20} />
+                طباعة
+            </button>
+        </div>
       </div>
 
       {!hasSearched ? (
@@ -472,6 +483,15 @@ export default function DetailedLogPage() {
             record={editingRecord}
             onClose={() => {
             setEditingRecord(null);
+            handleFetchData();
+            }}
+        />
+      )}
+      {showAddModal && (
+        <AddAttendanceModal
+            employees={employees}
+            onClose={() => {
+            setShowAddModal(false);
             handleFetchData();
             }}
         />
