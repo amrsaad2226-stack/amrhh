@@ -8,7 +8,8 @@ export default function AdminRequestsView({ pendingRequests }: { pendingRequests
 
   const handleAction = (id: number, status: "Approved" | "Rejected") => {
     startTransition(async () => {
-      await updateRequestStatus(id, status);
+      // استخدام as any لتجاوز خطأ الأنواع كما طلبت
+      await updateRequestStatus(id, status.toUpperCase() as any);
     });
   };
 
@@ -17,47 +18,36 @@ export default function AdminRequestsView({ pendingRequests }: { pendingRequests
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-bold mb-4 text-slate-800">طلبات السلف المعلقة</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full text-right border-collapse">
-          <thead>
-            <tr className="bg-slate-100 text-slate-700">
-              <th className="p-3 border-b">الموظف</th>
-              <th className="p-3 border-b">المبلغ</th>
-              <th className="p-3 border-b">السبب</th>
-              <th className="p-3 border-b">التاريخ</th>
-              <th className="p-3 border-b text-center">إجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pendingRequests.map((req) => (
-              <tr key={req.id} className="border-b hover:bg-slate-50">
-                <td className="p-3 font-semibold">{req.employee.name}</td>
-                <td className="p-3 text-red-600 font-bold">{req.amount} ج</td>
-                <td className="p-3 text-slate-600">{req.reason || "-"}</td>
-                <td className="p-3">{new Date(req.createdAt).toLocaleDateString("ar-EG")}</td>
-                <td className="p-3 flex justify-center gap-2">
-                  <button 
-                    onClick={() => handleAction(req.id, "Approved")}
-                    disabled={isPending}
-                    className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:opacity-50 text-sm"
-                  >
-                    موافقة
-                  </button>
-                  <button 
-                    onClick={() => handleAction(req.id, "Rejected")}
-                    disabled={isPending}
-                    className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:opacity-50 text-sm"
-                  >
-                    رفض
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="bg-white rounded-lg shadow">
+      <ul className="divide-y divide-slate-100">
+        {pendingRequests.map((req) => (
+          <li key={req.id} className="p-4 flex items-center justify-between">
+            <div>
+              <p className="font-bold text-slate-800">{req.employee.name}</p>
+              <p className="text-sm text-slate-600">
+                يطلب سلفة بقيمة <span className="font-bold">{req.amount}</span> جنيه
+              </p>
+              {req.reason && <p className="text-xs text-slate-400 mt-1">السبب: {req.reason}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => handleAction(req.id, "Approved")}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-bold text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:bg-slate-300"
+              >
+                موافقة
+              </button>
+              <button 
+                onClick={() => handleAction(req.id, "Rejected")}
+                disabled={isPending}
+                className="px-4 py-2 text-sm font-bold text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:bg-slate-300"
+              >
+                رفض
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
