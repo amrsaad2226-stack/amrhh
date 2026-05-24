@@ -39,7 +39,7 @@ export default async function AdminDashboard() {
         </div>
 
         {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
           <Link href="/admin/branches" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group flex items-center gap-4 active:scale-95">
             <div className="bg-blue-50 text-blue-600 p-4 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
               <Building2 size={24} />
@@ -77,6 +77,16 @@ export default async function AdminDashboard() {
             <div>
               <h3 className="font-black text-slate-800 text-lg">النقدية والعهد</h3>
               <p className="text-xs text-slate-400 font-bold mt-1">إدارة السلف والمصروفات</p>
+            </div>
+          </Link>
+
+          <Link href="/admin/requests" className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-orange-300 transition-all group flex items-center gap-4 active:scale-95">
+            <div className="bg-orange-50 text-orange-600 p-4 rounded-2xl group-hover:bg-orange-600 group-hover:text-white transition-colors">
+              <DollarSign size={24} />
+            </div>
+            <div>
+              <h3 className="font-black text-slate-800 text-lg">طلبات السلف</h3>
+              <p className="text-xs text-slate-400 font-bold mt-1">مراجعة الطلبات المعلقة</p>
             </div>
           </Link>
         </div>

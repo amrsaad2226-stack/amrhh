@@ -7,7 +7,6 @@ import { LogOut } from "lucide-react";
 import ThemeToggle from "../_components/ThemeToggle";
 import PortalView from "./PortalView";
 import { SalaryType } from "@prisma/client";
-import AdvanceRequestSection from "./AdvanceRequestSection"; // 1. استيراد المكون الجديد
 
 export default async function EmployeePortal() {
   const cookieStore = await cookies();
@@ -26,10 +25,10 @@ export default async function EmployeePortal() {
 
   if (!employee) redirect("/login");
 
-  // 2. جلب طلبات السلف السابقة
-  const existingRequests = await db.cashAdvanceRequest.findMany({
+  const cashAdvanceRequests = await db.cashAdvanceRequest.findMany({
     where: { employeeId: empId },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    take: 5
   });
 
   let targetHours: number;
@@ -96,15 +95,10 @@ export default async function EmployeePortal() {
           attendanceRecords={processedAttendance} 
           previousBalance={previousBalance}
           totalEarnings={currentTotalSalary} 
-          totalHours={totalHoursWorked}
+          totalHours={totalHoursWorked} // التصحيح هنا
           targetHours={targetHours}
           periodLabel={periodLabel}
-        />
-
-        {/* 3. إضافة قسم طلب السلفة وتمرير البيانات إليه */}
-        <AdvanceRequestSection 
-          employeeId={empId} 
-          existingRequests={existingRequests} 
+          cashAdvanceRequests={cashAdvanceRequests}
         />
         
       </div>
