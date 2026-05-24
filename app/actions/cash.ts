@@ -8,21 +8,57 @@ export async function addTransaction(formData: FormData) {
   const amount = parseFloat(formData.get("amount") as string);
   const note = formData.get("note") as string;
   const employeeId = formData.get("employeeId");
+  const advanceRequestId = formData.get("advanceRequestId"); // الحقل الجديد
 
-  if (!amount || amount <= 0) {
-    return { error: "المبلغ غير صالح" };
+  if (!amount || amount <= 0) return { error: "المبلغ غير صالح" };
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      // 1. إنشاء حركة النقدية (الخزينة)
+      const transaction = await tx.cashTransaction.create({
+        data: {
+          type,
+          amount,
+          note: advanceRequestId ? `[سلفة معتمدة] ${note}` : note,
+          employeeId: employeeId && employeeId !== "" ? Number(employeeId) : null,
+          advanceRequestId: advanceRequestId ? Number(advanceRequestId) : null,
+        },
+      });
+
+      // 2. إذا كانت سلفة، نحدث حالة الطلب الأصلي ليصبح "تم الصرف"
+      if (advanceRequestId) {
+        await tx.cashAdvanceRequest.update({
+          where: { id: Number(advanceRequestId) },
+          data: { status: "Disbursed" }
+        });
+      }
+
+      return transaction;
+    });
+
+    revalidatePath("/admin/cash");
+    return { success: true, data: result };
+  } catch (error) {
+    return { error: "حدث خطأ أثناء تسجيل العملية" };
   }
+}
 
-  const newTransaction = await db.cashTransaction.create({
+export async function handleAdvanceRequest(empId: number, amount: number, reason: string) {
+  await db.cashAdvanceRequest.create({
     data: {
-      type,
+      employeeId: empId,
       amount,
-      note,
-      employeeId: employeeId && employeeId !== "" ? Number(employeeId) : null,
-    },
+      reason,
+      status: "Pending" 
+    }
   });
+  revalidatePath("/portal");
+}
 
-  revalidatePath("/admin/cash");
-
-  return { success: true, data: newTransaction };
+export async function updateRequestStatus(id: number, status: "Approved" | "Rejected") {
+  await db.cashAdvanceRequest.update({
+    where: { id },
+    data: { status }
+  });
+  revalidatePath("/admin/requests");
 }

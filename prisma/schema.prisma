@@ -19,35 +19,35 @@ model Branch {
 }
 
 model Employee {
-  id               Int      @id @default(autoincrement())
-  code             String   @unique
-  name             String
-  password         String
-  deviceId         String?  @unique
-  role             Role     @default(EMPLOYEE)
+  id                  Int                  @id @default(autoincrement())
+  code                String               @unique
+  name                String
+  password            String
+  deviceId            String?              @unique
+  role                Role                 @default(EMPLOYEE)
   
-  branchId         Int?
-  branch           Branch?  @relation(fields: [branchId], references: [id])
-  isAnyBranch      Boolean  @default(false)
+  branchId            Int?
+  branch              Branch?              @relation(fields: [branchId], references: [id])
+  isAnyBranch         Boolean              @default(false)
 
-  dailyHours       Int      @default(10)
-  dailySalary      Float
-  overtimeRate     Float    @default(1.0)
-  department       String
-  allowDist        Int      @default(50)
+  dailyHours          Int                  @default(10)
+  dailySalary         Float
+  overtimeRate        Float                @default(1.0)
+  department          String
+  allowDist           Int                  @default(50)
 
-  // New field for Salary Type
-  salaryType       SalaryType @default(MONTHLY)
+  salaryType          SalaryType           @default(MONTHLY)
 
-  offDay           String   @default("NONE")
-  offDayHours      Int      @default(0)
-  timeIn           String   @default("09:00")
-  timeOut          String   @default("17:00")
+  offDay              String               @default("NONE")
+  offDayHours         Int                  @default(0)
+  timeIn              String               @default("09:00")
+  timeOut             String               @default("17:00")
   
-  createdAt        DateTime @default(now())
-  attendances      Attendance[]
-  leaveRequests    LeaveRequest[]
-  cashTransactions CashTransaction[]
+  createdAt           DateTime             @default(now())
+  attendances         Attendance[]
+  leaveRequests       LeaveRequest[]
+  cashTransactions    CashTransaction[]
+  cashAdvanceRequests CashAdvanceRequest[] // Relation to cash advance requests
 }
 
 model Attendance {
@@ -57,7 +57,7 @@ model Attendance {
   checkIn       DateTime? 
   checkOut      DateTime? 
   
-  notes         String?  // Added this field
+  notes         String?
 
   latIn         Float?
   lngIn         Float?
@@ -67,8 +67,8 @@ model Attendance {
   status        String?   
   
   requiredHours Int      @default(10) 
-  duration      Float?   // Made optional
-  overtime      Float?   // Made optional
+  duration      Float?
+  overtime      Float?
 
   employeeId    Int
   employee      Employee @relation(fields: [employeeId], references: [id])
@@ -79,7 +79,6 @@ enum Role {
   EMPLOYEE
 }
 
-// Enum for Salary Type
 enum SalaryType {
   DAILY
   WEEKLY
@@ -98,17 +97,34 @@ model LeaveRequest {
   createdAt    DateTime @default(now())
 }
 
+// Model for cash advance requests
+model CashAdvanceRequest {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  amount      Float
+  reason      String?
+  status      String   @default("Pending") // Pending, Approved, Rejected, Disbursed
+  createdAt   DateTime @default(now())
+  
+  transaction CashTransaction? 
+}
+
 model CashTransaction {
   id          Int      @id @default(autoincrement())
   type        CashType
   amount      Float
   note        String?
-  date        DateTime? // Added this field
+  date        DateTime?
 
   employeeId  Int?
   employee    Employee? @relation(fields: [employeeId], references: [id])
 
   createdAt   DateTime @default(now())
+
+  // Fields for linking to an advance request
+  advanceRequestId Int? @unique
+  advanceRequest   CashAdvanceRequest? @relation(fields: [advanceRequestId], references: [id])
 }
 
 enum CashType {
