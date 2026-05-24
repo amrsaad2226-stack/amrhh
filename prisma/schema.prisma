@@ -67,8 +67,8 @@ model Attendance {
   status        String?   
   
   requiredHours Int      @default(10) 
-  duration      Float    @default(0)
-  overtime      Float    @default(0)
+  duration      Float?   // Made optional
+  overtime      Float?   // Made optional
 
   employeeId    Int
   employee      Employee @relation(fields: [employeeId], references: [id])

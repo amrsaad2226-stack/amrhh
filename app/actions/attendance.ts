@@ -237,19 +237,32 @@ async function calculateMetrics(records: any[], cashAdvances: any[], initialBala
         displayActualHours = accumulatedDayHours[dayKey] > 0 ? accumulatedDayHours[dayKey].toFixed(2) : (record.checkOut ? "0.00" : "-");
 
         if (isLastOfDay) {
-            const empDailyHours = record.employee.dailyHours || 8;
+            const empDailyHours = record.employee.dailyHours || 10; // حسب الديفولت في البريزما
             const empDailySalary = record.employee.dailySalary || 0;
             const hourlyRate = empDailyHours > 0 ? empDailySalary / empDailyHours : 0;
+            
+            // جلب المعامل من البريزما
+            const multiplier = record.employee.overtimeRate || 1.0;
 
             const totalDayHrs = dailyTotals[dayKey] || 0;
+            
+            // حساب العجز
             const def = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
-            const ovt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
+            
+            // حساب الإضافي الفعلي وضربه في المعامل
+            const rawOvt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
+            const adjustedOvt = rawOvt * multiplier;
 
             deficit = def > 0 ? def.toFixed(2) : "-";
-            overtime = ovt > 0 ? ovt.toFixed(2) : "-";
+            // الساعات الإضافية المعروضة ستكون بعد ضربها في المعامل
+            overtime = adjustedOvt > 0 ? adjustedOvt.toFixed(2) : "-";
 
             const advanceForDay = dailyAdvances[dateStr] || 0;
-            const dailyEarned = totalDayHrs * hourlyRate;
+            
+            // الحساب المالي: الساعات الأساسية + (الساعات الإضافية × المعامل)
+            const baseHours = Math.min(totalDayHrs, empDailyHours);
+            const dailyEarned = (baseHours + adjustedOvt) * hourlyRate;
+            
             const netPay = dailyEarned - advanceForDay;
 
             cumulativeBalance += netPay;

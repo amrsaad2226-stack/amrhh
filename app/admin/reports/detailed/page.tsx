@@ -241,7 +241,7 @@ export default function DetailedLogPage() {
                          <td className="p-4 text-center text-green-500 font-black">{record.isLastOfDay ? record.dailyEarned.toFixed(2) : '-'}</td>
                          <td className="p-4 text-center text-slate-500">-</td>
                          <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.isLastOfDay ? record.balance : '-'}</td>
-                         <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes && <p className="font-bold text-slate-600 dark:text-slate-300">{record.notes}</p>}{record.deficit !== '-' && <span className="text-red-500">عجز: {record.deficit} س</span>}{record.overtime !== '-' && <span className="text-green-500 ml-2">إضافي: {record.overtime} س</span>} {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}</td>
+                         <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes && <p className="font-bold text-slate-600 dark:text-slate-300">{record.notes}</p>}{record.deficit > 0 && <span className="text-red-500">عجز: {record.deficit} س</span>}{record.overtime > 0 && <span className="text-green-500 ml-2">إضافي: {record.overtime} ج.م</span>} {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}</td>
                       </tr>
                     );
                   })}
@@ -437,7 +437,7 @@ export default function DetailedLogPage() {
                          <td className="p-4 text-center text-green-500 font-black">{record.isLastOfDay ? record.dailyEarned.toFixed(2) : '-'}</td>
                          <td className="p-4 text-center text-slate-500">-</td>
                          <td className="p-4 text-center font-mono font-black text-amber-600 dark:text-amber-400">{record.isLastOfDay ? record.balance : '-'}</td>
-                         <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes && <p className="font-bold text-slate-600 dark:text-slate-300">{record.notes}</p>}{record.deficit !== '-' && <span className="text-red-500">عجز: {record.deficit} س</span>}{record.overtime !== '-' && <span className="text-green-500 ml-2">إضافي: {record.overtime} س</span>} {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}</td>
+                         <td className="p-4 text-xs italic text-slate-400 max-w-[200px] truncate">{record.notes && <p className="font-bold text-slate-600 dark:text-slate-300">{record.notes}</p>}{record.deficit > 0 && <span className="text-red-500">عجز: {record.deficit} س</span>}{record.overtime > 0 && <span className="text-green-500 ml-2">إضافي: {record.overtime} ج.م</span>} {record.actualHrs && record.isLastOfDay && <span> (إجمالي العمل: {parseFloat(record.actualHrs).toFixed(2)} س)</span>}</td>
                           <td className="p-4 text-center">
                               <div className="flex items-center justify-center gap-2">
                                   <button onClick={() => setEditingRecord(record)} className="text-blue-500 hover:text-blue-700"><Edit size={18} /></button>

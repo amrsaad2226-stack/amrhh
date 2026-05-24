@@ -36,35 +36,43 @@ interface UpdateAttendanceData {
 
 export async function updateAttendanceAction(data: UpdateAttendanceData) {
     try {
-        let duration: number | null = null;
+        const attendance = await prisma.attendance.findUnique({
+            where: { id: data.id },
+            include: { employee: true },
+        });
+
+        if (!attendance) {
+            return { error: 'سجل الحضور غير موجود' };
+        }
+
+        const { employee } = attendance;
+        let duration = 0;
+        let overtime = 0;
+
         if (data.checkIn && data.checkOut) {
             const checkInDate = new Date(data.checkIn);
             const checkOutDate = new Date(data.checkOut);
+            
             duration = (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60);
-
             if (duration < 0) {
                 duration += 24;
             }
-        }
 
-        const updateData: {
-            checkIn: Date | null;
-            checkOut: Date | null;
-            notes: string;
-            duration?: number;
-        } = {
-            checkIn: data.checkIn,
-            checkOut: data.checkOut,
-            notes: data.notes,
-        };
-
-        if (duration !== null) {
-            updateData.duration = duration;
+            const dailyHours = employee.dailyHours || 0;
+            const overtimeRate = employee.overtimeRate || 1;
+            const overtimeHours = Math.max(0, duration - dailyHours);
+            overtime = overtimeHours * overtimeRate;
         }
 
         await prisma.attendance.update({
             where: { id: data.id },
-            data: updateData,
+            data: {
+                checkIn: data.checkIn,
+                checkOut: data.checkOut,
+                notes: data.notes,
+                duration: duration,
+                overtime: overtime,
+            },
         });
 
         revalidatePath('/admin/reports/detailed');
@@ -88,8 +96,8 @@ export async function updateCashTransactionAction(data: UpdateCashData) {
             where: { id: data.id },
             data: {
                 amount: data.amount,
-                note: data.notes,   // Correctly mapping 'notes' from form to 'note' in DB
-                date: data.date,   // Correctly using the new 'date' field
+                note: data.notes,
+                date: data.date,
             },
         });
         revalidatePath('/admin/reports/detailed');
@@ -111,32 +119,41 @@ interface CreateAttendanceData {
 
 export async function createAttendanceAction(data: CreateAttendanceData) {
     try {
+        const employee = await prisma.employee.findUnique({
+            where: { id: data.employeeId },
+        });
+
+        if (!employee) {
+            return { error: 'الموظف غير موجود' };
+        }
+
         let duration = 0;
+        let overtime = 0;
 
         if (data.checkIn && data.checkOut) {
             const checkInDate = new Date(`${data.date}T${data.checkIn}:00+03:00`);
             const checkOutDate = new Date(`${data.date}T${data.checkOut}:00+03:00`);
-            duration =
-                (checkOutDate.getTime() - checkInDate.getTime()) /
-                (1000 * 60 * 60);
-
+            
+            duration = (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60);
             if (duration < 0) {
                 duration += 24;
             }
-        }
 
+            const dailyHours = employee.dailyHours || 0;
+            const overtimeRate = employee.overtimeRate || 1;
+            const overtimeHours = Math.max(0, duration - dailyHours);
+            overtime = overtimeHours * overtimeRate;
+        }
+        
         await prisma.attendance.create({
             data: {
                 employeeId: data.employeeId,
                 date: new Date(data.date),
-                checkIn: data.checkIn
-                    ? new Date(`${data.date}T${data.checkIn}:00+03:00`)
-                    : null,
-                checkOut: data.checkOut
-                    ? new Date(`${data.date}T${data.checkOut}:00+03:00`)
-                    : null,
+                checkIn: data.checkIn ? new Date(`${data.date}T${data.checkIn}:00+03:00`) : null,
+                checkOut: data.checkOut ? new Date(`${data.date}T${data.checkOut}:00+03:00`) : null,
                 notes: data.notes,
                 duration,
+                overtime,
             },
         });
 

@@ -134,11 +134,18 @@ export async function getDetailedLog(empId: string, startDate: string, endDate: 
 
       if (isLastOfDay) {
         const totalDayHrs = dailyTotals[`${record.employeeId}_${dateStr}`];
-        const def = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
-        const ovt = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
-        deficit = def > 0 ? def.toFixed(2) : "-";
-        overtime = ovt > 0 ? ovt.toFixed(2) : "-";
-        dailyEarned = totalDayHrs * hourlyRate;
+        const overtimeRate = record.employee.overtimeRate || 1;
+        
+        const defHours = totalDayHrs > 0 && totalDayHrs < empDailyHours ? empDailyHours - totalDayHrs : 0;
+        const ovtHours = totalDayHrs > empDailyHours ? totalDayHrs - empDailyHours : 0;
+        
+        const regularHours = totalDayHrs - ovtHours;
+        const regularPay = regularHours * hourlyRate;
+        const overtimePay = ovtHours * hourlyRate * overtimeRate;
+        
+        dailyEarned = regularPay + overtimePay;
+        deficit = defHours > 0 ? defHours.toFixed(2) : "-";
+        overtime = overtimePay > 0 ? overtimePay.toFixed(2) : "-"; // 'overtime' now holds the monetary value
       }
       return { 
         id: record.id, 
