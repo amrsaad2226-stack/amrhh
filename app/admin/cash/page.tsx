@@ -9,7 +9,10 @@ export default async function CashPage() {
     orderBy: { createdAt: 'desc' }
   });
 
-  const employees = await db.employee.findMany();
+  const employees = await db.employee.findMany({
+    include: { branch: true },
+    orderBy: { createdAt: 'desc' }
+  });
 
   return (
      <div className="min-h-screen bg-slate-50 p-4 md:p-10 font-sans text-right" dir="rtl">
